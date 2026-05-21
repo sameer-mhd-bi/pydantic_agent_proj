@@ -1,8 +1,4 @@
-# Pydantic AI Chat UI
-
-A React-based chat interface for [Pydantic AI](https://ai.pydantic.dev/). This package powers the documentation assistant at [ai.pydantic.dev/web/](https://ai.pydantic.dev/web/).
-
-Built with [Vercel AI SDK](https://sdk.vercel.ai/) and designed to work with Pydantic AI's streaming chat API.
+# Migration AI Chat UI - FE & BE
 
 ## Features
 
