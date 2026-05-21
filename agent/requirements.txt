@@ -1,0 +1,9 @@
+pydantic-ai-slim[web]
+pydantic-ai
+logfire
+pypdf
+chromadb
+sentence_transformers
+psycopg2
+snowflake-sqlalchemy
+petl
