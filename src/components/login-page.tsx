@@ -13,7 +13,7 @@ import {
 import { ModeToggle } from './mode-toggle'
 import { SignupDialog } from './signup-dialog'
 import { useAuth } from './user-provider'
-import logoSvg from '../assets/logo.svg'
+import aspLogo from '../assets/asp_logo.jpg'
 
 type LoginPageProps = {
   onLoginSuccess: () => void
@@ -62,9 +62,9 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
       </div>
 
       <div className="w-full max-w-md rounded-3xl border bg-card p-8 shadow-sm">
-        <div className="mb-8 flex flex-col items-center text-center">
-          <div className="mb-6 flex size-11 items-center justify-center rounded-2xl bg-sidebar">
-            <img src={logoSvg} alt="Migration Assistant" className="h-11 w-100" />
+        <div className="mb-10 flex flex-col items-center text-center">
+          <div className="mb-10 flex items-center justify-center bg-white p-4 rounded-lg">
+            <img src={aspLogo} alt="Migration Assistant" className="h-24 w-auto" />
           </div>
           <h1 className="text-3xl font-semibold tracking-tight">Migration Assistant</h1>
           <p className="mt-2 text-sm text-muted-foreground">
@@ -98,13 +98,13 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
             {isLoading ? 'Logging in...' : 'Login'}
           </Button>
 
-          <Button className="w-full" type="button" variant="outline" onClick={() => setShowSignup(true)} disabled={isLoading}>
+          <Button className="w-full" type="button" variant="outline" onClick={() => { setError(''); setShowSignup(true); }} disabled={isLoading}>
             Sign Up
           </Button>
         </form>
       </div>
 
-      <SignupDialog open={showSignup} onOpenChange={setShowSignup} onSubmit={handleSignup} isLoading={isLoading} error={authError} />
+      <SignupDialog open={showSignup} onOpenChange={setShowSignup} onSubmit={handleSignup} isLoading={isLoading} error={showSignup ? '' : authError} />
 
       <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
         <DialogContent>

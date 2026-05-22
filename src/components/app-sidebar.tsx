@@ -33,7 +33,7 @@ import type { User } from '@/types/user'
 import { getConversations, deleteConversation as deleteConv } from '@/lib/chat-db'
 import { stripBasePath, withBasePath } from '@/lib/base-path'
 import { ModeToggle } from './mode-toggle'
-import logoSvg from '../assets/logo.svg'
+// import logoSvg from '../assets/logo.svg'
 
 function useConversations(userId?: string): ConversationEntry[] {
   const [conversations, setConversations] = useState<ConversationEntry[]>([])
@@ -119,11 +119,10 @@ export function AppSidebar({ onLogout, currentUser }: { onLogout: () => void; cu
           </div>
           <div className="ml-2 flex items-center">
             <h1 className="text-l font-medium text-balance truncate whitespace-nowrap">
-              <img src={logoSvg} className="inline h-4 mr-2 mb-1" />
               <span className="group-data-[state=collapsed]:invisible">Migration Assistant</span>
             </h1>
           </div>
-          <div className="px-2 py-2 rounded-lg bg-accent/50 text-sm group-data-[state=collapsed]:hidden flex items-center justify-between">
+          <div className="px-2 py-2 rounded-lg text-sm group-data-[state=collapsed]:hidden flex items-center justify-between" style={{ backgroundColor: '#000000' }}>
             <div className="flex-1 min-w-0">
               <p className="font-medium truncate">{currentUser.fullName}</p>
               <p className="text-xs opacity-70 truncate">{currentUser.email}</p>
@@ -205,7 +204,7 @@ export function AppSidebar({ onLogout, currentUser }: { onLogout: () => void; cu
 
             <div className="px-2 pt-3 group-data-[state=collapsed]:hidden">
               <SidebarSeparator className="mx-0" />
-              <p className="pt-3 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              <p className="pt-3 text-xs font-semibold uppercase tracking-[0.12em]" style={{ color: '#DFDFDF' }}>
                 Chat history
               </p>
             </div>
@@ -226,7 +225,7 @@ export function AppSidebar({ onLogout, currentUser }: { onLogout: () => void; cu
                           <MessageCircle className="size-3 mt-1" />
                           <span className="flex flex-col items-start">
                             <span className="truncate max-w-44">{conversation.firstMessage}</span>
-                            <span className="text-xs opacity-30">
+                            <span className="text-xs" style={{ color: '#DFDFDF' }}>
                               {new Date(conversation.timestamp).toLocaleString()}
                             </span>
                           </span>
