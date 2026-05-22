@@ -23,8 +23,8 @@ export function AdminPage() {
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [editRole, setEditRole] = useState<'user' | 'admin'>('user')
   const [editPermissions, setEditPermissions] = useState({
-    agentDetails: true,
-    knowledgeDetails: true,
+    agentDetails: false,
+    knowledgeDetails: false,
     databaseExplorer: true,
     databaseConfig: false,
   })
@@ -58,8 +58,8 @@ export function AdminPage() {
     setEditingUser(user)
     setEditRole(user.role)
     setEditPermissions(user.permissions || {
-      agentDetails: true,
-      knowledgeDetails: true,
+      agentDetails: false,
+      knowledgeDetails: false,
       databaseExplorer: true,
       databaseConfig: false,
     })

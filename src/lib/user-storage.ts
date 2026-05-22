@@ -74,8 +74,8 @@ export function createUser(data: SignupFormData): User {
     createdAt: new Date().toISOString(),
     lastLogin: null,
     permissions: {
-      agentDetails: true,
-      knowledgeDetails: true,
+      agentDetails: false,
+      knowledgeDetails: false,
       databaseExplorer: true,
       databaseConfig: false,
     },
