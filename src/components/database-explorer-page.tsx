@@ -17,6 +17,7 @@ import {
   Loader,
   Shrink,
 } from 'lucide-react'
+import { useAuth } from './user-provider'
 import { MigrationPlanViewer } from '@/components/migration-plan-viewer'
 import { ColumnMappingViewer } from '@/components/column-mapping-viewer'
 
@@ -270,6 +271,11 @@ function ColumnRow({
   )
 }
 export function DatabaseExplorerPage() {
+  const { currentUser } = useAuth()
+  
+  // Helper function to create user-specific storage keys
+  const getStorageKey = (key: string) => `${currentUser?.id || 'guest'}-${key}`
+
   const [connectionString, setConnectionString] =
     useState('')
 
@@ -330,25 +336,25 @@ export function DatabaseExplorerPage() {
   useEffect(() => {
     const savedConnectionString =
       localStorage.getItem(
-        'db-explorer-connection',
+        getStorageKey('db-explorer-connection'),
       )
 
     const savedDatabase = localStorage.getItem(
-      'db-explorer-database',
+      getStorageKey('db-explorer-database'),
     )
 
     const savedAttempted =
       localStorage.getItem(
-        'db-explorer-attempted',
+        getStorageKey('db-explorer-attempted'),
       )
 
     const savedMermaid = localStorage.getItem(
-      'db-explorer-mermaid',
+      getStorageKey('db-explorer-mermaid'),
     )
 
     const savedMigrationPlan =
       localStorage.getItem(
-        'db-explorer-migration-plan',
+        getStorageKey('db-explorer-migration-plan'),
       )
 
     if (savedConnectionString) {
@@ -377,21 +383,21 @@ export function DatabaseExplorerPage() {
 
   useEffect(() => {
     localStorage.setItem(
-      'db-explorer-connection',
+      getStorageKey('db-explorer-connection'),
       connectionString,
     )
   }, [connectionString])
 
   useEffect(() => {
     localStorage.setItem(
-      'db-explorer-database',
+      getStorageKey('db-explorer-database'),
       selectedDatabase,
     )
   }, [selectedDatabase])
 
   useEffect(() => {
     localStorage.setItem(
-      'db-explorer-attempted',
+      getStorageKey('db-explorer-attempted'),
       String(hasAttemptedConnection),
     )
   }, [hasAttemptedConnection])
@@ -399,7 +405,7 @@ export function DatabaseExplorerPage() {
   useEffect(() => {
     if (mermaidCode) {
       localStorage.setItem(
-        'db-explorer-mermaid',
+        getStorageKey('db-explorer-mermaid'),
         mermaidCode,
       )
     }
@@ -408,7 +414,7 @@ export function DatabaseExplorerPage() {
   useEffect(() => {
     if (migrationPlan) {
       localStorage.setItem(
-        'db-explorer-migration-plan',
+        getStorageKey('db-explorer-migration-plan'),
         migrationPlan,
       )
     }
@@ -675,7 +681,7 @@ export function DatabaseExplorerPage() {
       )
 
       localStorage.setItem(
-        'db-explorer-migration-plan',
+        getStorageKey('db-explorer-migration-plan'),
         data.migration_plan,
       )
 
@@ -713,33 +719,33 @@ export function DatabaseExplorerPage() {
     setMigrationPlanEditable('')
 
     localStorage.removeItem(
-      'db-explorer-mermaid',
+      getStorageKey('db-explorer-mermaid'),
     )
 
     localStorage.removeItem(
-      'db-explorer-migration-plan',
+      getStorageKey('db-explorer-migration-plan'),
     )
   }
 
   const handleClearHistory = () => {
     localStorage.removeItem(
-      'db-explorer-connection',
+      getStorageKey('db-explorer-connection'),
     )
 
     localStorage.removeItem(
-      'db-explorer-database',
+      getStorageKey('db-explorer-database'),
     )
 
     localStorage.removeItem(
-      'db-explorer-attempted',
+      getStorageKey('db-explorer-attempted'),
     )
 
     localStorage.removeItem(
-      'db-explorer-mermaid',
+      getStorageKey('db-explorer-mermaid'),
     )
 
     localStorage.removeItem(
-      'db-explorer-migration-plan',
+      getStorageKey('db-explorer-migration-plan'),
     )
 
     setConnectionString('')
@@ -785,7 +791,7 @@ export function DatabaseExplorerPage() {
       setMigrationPlan(migrationPlanEditable)
 
       localStorage.setItem(
-        'db-explorer-migration-plan',
+        getStorageKey('db-explorer-migration-plan'),
         migrationPlanEditable,
       )
 
@@ -1070,11 +1076,11 @@ export function DatabaseExplorerPage() {
               setMigrationPlanEditable('')
 
               localStorage.removeItem(
-                'db-explorer-mermaid',
+                getStorageKey('db-explorer-mermaid'),
               )
 
               localStorage.removeItem(
-                'db-explorer-migration-plan',
+                getStorageKey('db-explorer-migration-plan'),
               )
             }}
             className="font-mono text-sm"

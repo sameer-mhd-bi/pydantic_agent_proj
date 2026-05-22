@@ -9,6 +9,7 @@ Run the agent backend + pre-packaged frontend:
 ```bash
 cd agent
 uv sync
+uv pip install -r requirements.txt
 uv run uvicorn chatbot.server:app
 ```
 

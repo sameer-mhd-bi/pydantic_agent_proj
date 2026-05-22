@@ -135,10 +135,19 @@ def update_agent_details(**fields: str) -> None:
     refresh_combined_memory()
 
 
-def build_runtime_instructions() -> str:
+def build_runtime_instructions(user_name: str | None = None) -> str:
     details = get_agent_details_payload()
+    
+    # Build explicit memory with dynamic user name
+    user_memory = f"User memory: The user's name is {user_name or 'Guest'}, " \
+                  "Always follow migration rules and guidelines, " \
+                  "User is a database administrator responsible for managing and migrating databases, " \
+                  "User has access to both Postgres and Snowflake databases, " \
+                  "User is seeking assistance with SQL queries, database schema insights, and migration strategies. " \
+                  "Always respond in Table format or bullet points for better readability, never respond in paragraphs. "
+    
     sections = [
-        explicit_memory.strip(),
+        user_memory.strip(),
         details['db_schema_memory'],
         details['business_rules'],
         details['app_context'],
@@ -783,13 +792,21 @@ async def chat_endpoint(request: Request):
             return JSONResponse({'error': error}, status_code=400)
 
         model_ref = extra_data.model or next(iter(models.values()))
+        
+        # Extract userName from request body
+        user_name = None
+        try:
+            body = adapter.run_input.__pydantic_extra__ or {}
+            user_name = body.get('userName')
+        except Exception as e:
+            logger.debug("Could not extract userName from request: %s", e)
 
         return await VercelAIAdapter.dispatch_request(
             request,
             agent=agent,
             model=model_ref,
             deps=deps,
-            instructions=build_runtime_instructions(),
+            instructions=build_runtime_instructions(user_name),
         )
     except Exception as e:
         return JSONResponse({'error': f'Chat request failed: {str(e)}'}, status_code=500)

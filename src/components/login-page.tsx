@@ -2,36 +2,61 @@ import { useState, type FormEvent } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { ModeToggle } from './mode-toggle'
+import { SignupDialog } from './signup-dialog'
+import { useAuth } from './user-provider'
 import logoSvg from '../assets/logo.svg'
 
 type LoginPageProps = {
   onLoginSuccess: () => void
 }
 
-const VALID_USERNAME = 'roo'
-const VALID_PASSWORD = 'root'
-
 export function LoginPage({ onLoginSuccess }: LoginPageProps) {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [showSignup, setShowSignup] = useState(false)
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+  const { login, signup, isLoading, error: authError } = useAuth()
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
-    if (username === VALID_USERNAME && password === VALID_PASSWORD) {
+    try {
+      await login(username, password)
       window.localStorage.setItem('migration-assistant-authenticated', 'true')
       setError('')
+      window.history.pushState({}, '', '/')
+      window.dispatchEvent(new Event('history-state-changed'))
       onLoginSuccess()
-      return
+    } catch {
+      setError(authError || 'Invalid username or password.')
     }
+  }
 
-    setError('Invalid username or password.')
+  const handleSignup = async (data: Parameters<typeof signup>[0]) => {
+    try {
+      await signup(data)
+      setShowSignup(false)
+      setError('')
+      setUsername('')
+      setPassword('')
+      setShowSuccessDialog(true)
+    } catch {
+      throw new Error(authError || 'Signup failed')
+    }
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center bg-background px-4 py-10 text-foreground">
+    <div className="relative flex min-h-screen items-center justify-center px-4 py-10 text-foreground" style={{ backgroundColor: '#56378c' }}>
       <div className="absolute top-4 right-4">
         <ModeToggle />
       </div>
@@ -69,11 +94,31 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
 
           {error && <div className="rounded-xl border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>}
 
-          <Button className="w-full" type="submit">
-            Login
+          <Button className="w-full" type="submit" disabled={isLoading}>
+            {isLoading ? 'Logging in...' : 'Login'}
+          </Button>
+
+          <Button className="w-full" type="button" variant="outline" onClick={() => setShowSignup(true)} disabled={isLoading}>
+            Sign Up
           </Button>
         </form>
       </div>
+
+      <SignupDialog open={showSignup} onOpenChange={setShowSignup} onSubmit={handleSignup} isLoading={isLoading} error={authError} />
+
+      <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Account Created Successfully</DialogTitle>
+            <DialogDescription>
+              Your account has been created. Please log in with your credentials to continue.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setShowSuccessDialog(false)}>Got it</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

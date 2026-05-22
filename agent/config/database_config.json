@@ -3,8 +3,8 @@
     "host": "localhost",
     "port": 5432,
     "user": "postgres",
-    "password": "Pass@123",
-    "dbname": "agent_database"
+    "password": "root",
+    "dbname": "ai"
   },
   "snowflake": {
     "account": "bxvclfn-jn77484",

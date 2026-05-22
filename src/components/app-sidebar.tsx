@@ -1,4 +1,4 @@
-import { BookOpen, CirclePlus, Database, FileText, LogOut, MessageCircle, Settings, Trash } from 'lucide-react'
+import { BookOpen, CirclePlus, Database, FileText, LogOut, MessageCircle, Settings, Trash, UserCog } from 'lucide-react'
 import type React from 'react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
@@ -29,17 +29,18 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useConversationIdFromUrl } from '@/hooks/useConversationIdFromUrl'
 import { cn } from '@/lib/utils'
 import type { ConversationEntry } from '@/types'
+import type { User } from '@/types/user'
 import { getConversations, deleteConversation as deleteConv } from '@/lib/chat-db'
 import { stripBasePath, withBasePath } from '@/lib/base-path'
 import { ModeToggle } from './mode-toggle'
 import logoSvg from '../assets/logo.svg'
 
-function useConversations(): ConversationEntry[] {
+function useConversations(userId?: string): ConversationEntry[] {
   const [conversations, setConversations] = useState<ConversationEntry[]>([])
 
   useEffect(() => {
     const loadConversations = () => {
-      getConversations()
+      getConversations(userId)
         .then(setConversations)
         .catch((err: unknown) => {
           console.error('Failed to load conversations:', err)
@@ -53,7 +54,7 @@ function useConversations(): ConversationEntry[] {
     return () => {
       window.removeEventListener('conversations-changed', loadConversations)
     }
-  }, [])
+  }, [userId])
 
   return conversations
 }
@@ -81,8 +82,8 @@ function deleteConversation(conversationId: string) {
   })
 }
 
-export function AppSidebar({ onLogout }: { onLogout: () => void }) {
-  const conversations = useConversations()
+export function AppSidebar({ onLogout, currentUser }: { onLogout: () => void; currentUser: User }) {
+  const conversations = useConversations(currentUser.id)
   const [conversationId] = useConversationIdFromUrl()
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [conversationToDelete, setConversationToDelete] = useState<ConversationEntry | null>(null)
@@ -111,18 +112,35 @@ export function AppSidebar({ onLogout }: { onLogout: () => void }) {
 
   return (
     <TooltipProvider>
-      <Sidebar collapsible="icon" className="bg-sidebar text-sidebar-foreground">
-        <SidebarHeader className="bg-sidebar text-sidebar-foreground">
-          <SidebarTrigger className="ml-auto" />
+      <Sidebar collapsible="icon" style={{ backgroundColor: '#56378c', color: '#DFDFDF' }}>
+        <SidebarHeader className="flex flex-col gap-2" style={{ backgroundColor: '#56378c', color: '#DFDFDF' }}>
+          <div className="flex items-center justify-between">
+            <SidebarTrigger className="ml-0" />
+          </div>
           <div className="ml-2 flex items-center">
             <h1 className="text-l font-medium text-balance truncate whitespace-nowrap">
               <img src={logoSvg} className="inline h-4 mr-2 mb-1" />
               <span className="group-data-[state=collapsed]:invisible">Migration Assistant</span>
             </h1>
           </div>
+          <div className="px-2 py-2 rounded-lg bg-accent/50 text-sm group-data-[state=collapsed]:hidden flex items-center justify-between">
+            <div className="flex-1 min-w-0">
+              <p className="font-medium truncate">{currentUser.fullName}</p>
+              <p className="text-xs opacity-70 truncate">{currentUser.email}</p>
+            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" onClick={onLogout} className="h-8 w-8 ml-2 flex-shrink-0">
+                  <LogOut className="h-4 w-4" />
+                  <span className="sr-only">Logout</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Logout</TooltipContent>
+            </Tooltip>
+          </div>
         </SidebarHeader>
 
-        <SidebarContent>
+        <SidebarContent style={{ backgroundColor: '#56378c' }}>
           <SidebarGroup>
             <SidebarMenu className="mb-2">
               <SidebarMenuItem>
@@ -133,6 +151,7 @@ export function AppSidebar({ onLogout }: { onLogout: () => void }) {
                   </a>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              {currentUser.permissions?.agentDetails !== false && (
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="View agent details">
                   <a href={withBasePath('/agent-details')} onClick={doLocalNavigation}>
@@ -141,30 +160,47 @@ export function AppSidebar({ onLogout }: { onLogout: () => void }) {
                   </a>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="View knowledge logic">
-                  <a href={withBasePath('/knowledge-details')} onClick={doLocalNavigation}>
-                    <BookOpen />
-                    <span>Knowledge details</span>
-                  </a>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Explore database schema">
-                  <a href={withBasePath('/database-explorer')} onClick={doLocalNavigation}>
-                    <Database />
-                    <span>Database Profiler</span>
-                  </a>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Configure databases">
-                  <a href={withBasePath('/database-config')} onClick={doLocalNavigation}>
-                    <Settings />
-                    <span>Database Config</span>
-                  </a>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+              )}
+              {currentUser.permissions?.knowledgeDetails !== false && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="View knowledge logic">
+                    <a href={withBasePath('/knowledge-details')} onClick={doLocalNavigation}>
+                      <BookOpen />
+                      <span>Knowledge details</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              {currentUser.permissions?.databaseExplorer !== false && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Explore database schema">
+                    <a href={withBasePath('/database-explorer')} onClick={doLocalNavigation}>
+                      <Database />
+                      <span>Database Profiler</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              {currentUser.role === 'admin' && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Configure databases">
+                    <a href={withBasePath('/database-config')} onClick={doLocalNavigation}>
+                      <Settings />
+                      <span>Database Config</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              {currentUser.role === 'admin' && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Manage users">
+                    <a href={withBasePath('/admin')} onClick={doLocalNavigation}>
+                      <UserCog />
+                      <span>Admin Panel</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
             </SidebarMenu>
 
             <div className="px-2 pt-3 group-data-[state=collapsed]:hidden">
@@ -219,17 +255,8 @@ export function AppSidebar({ onLogout }: { onLogout: () => void }) {
           </SidebarGroup>
         </SidebarContent>
 
-        <SidebarFooter className="flex-row items-center justify-between gap-2">
+        <SidebarFooter className="flex-row items-center justify-between gap-2" style={{ backgroundColor: '#56378c' }}>
           <ModeToggle />
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" onClick={onLogout}>
-                <LogOut className="h-[1.2rem] w-[1.2rem]" />
-                <span className="sr-only">Logout</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Logout</TooltipContent>
-          </Tooltip>
         </SidebarFooter>
 
         <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

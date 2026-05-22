@@ -4,75 +4,123 @@ import { AgentDetailsPage } from './components/agent-details-page.tsx'
 import { KnowledgeDetailsPage } from './components/knowledge-details-page.tsx'
 import { DatabaseExplorerPage } from './components/database-explorer-page.tsx'
 import { DatabaseConfigPage } from './components/database-config-page.tsx'
+import { AdminPage } from './components/admin-page.tsx'
 import { LoginPage } from './components/login-page.tsx'
 import { AppSidebar } from './components/app-sidebar.tsx'
 import { ThemeProvider } from './components/theme-provider.tsx'
+import { UserProvider, useAuth } from './components/user-provider.tsx'
 import { SidebarProvider } from './components/ui/sidebar.tsx'
 import { Toaster } from './components/ui/sonner.tsx'
 import { cn } from './lib/utils.ts'
 import { migrateFromLocalStorage } from './lib/chat-db.ts'
 import { useConversationIdFromUrl } from './hooks/useConversationIdFromUrl.tsx'
+// import { getUserConversationsKey } from './lib/user-storage'
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 const queryClient = new QueryClient()
 
-export default function App() {
+function AppContent() {
   const [ready, setReady] = useState(false)
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [route] = useConversationIdFromUrl()
+  const { currentUser, logout } = useAuth()
 
   const isAgentDetailsPage = route === '/agent-details'
   const isKnowledgeDetailsPage = route === '/knowledge-details'
   const isDatabaseExplorerPage = route === '/database-explorer'
   const isDatabaseConfigPage = route === '/database-config'
-  const isDetailsPage = isAgentDetailsPage || isKnowledgeDetailsPage || isDatabaseExplorerPage || isDatabaseConfigPage
+  const isAdminPage = route === '/admin'
+  const isDetailsPage = isAgentDetailsPage || isKnowledgeDetailsPage || isDatabaseExplorerPage || isDatabaseConfigPage || isAdminPage
 
   useEffect(() => {
-    setIsAuthenticated(window.localStorage.getItem('migration-assistant-authenticated') === 'true')
-
-    migrateFromLocalStorage()
-      .then((migrated) => {
-        if (migrated) {
-          window.dispatchEvent(new Event('conversations-changed'))
-        }
-      })
-      .catch((err: unknown) => {
-        console.error('Migration failed:', err)
-      })
-      .finally(() => {
-        setReady(true)
-      })
-  }, [])
+    if (currentUser) {
+      migrateFromLocalStorage()
+        .then((migrated) => {
+          if (migrated) {
+            window.dispatchEvent(new Event('conversations-changed'))
+          }
+        })
+        .catch((err: unknown) => {
+          console.error('Migration failed:', err)
+        })
+        .finally(() => {
+          setReady(true)
+        })
+    }
+  }, [currentUser])
 
   const handleLogout = () => {
-    window.localStorage.removeItem('migration-assistant-authenticated')
-    setIsAuthenticated(false)
+    logout()
+  }
+
+  if (!currentUser) {
+    return <LoginPage onLoginSuccess={() => {}} />
+  }
+
+  if (isAdminPage && currentUser.role !== 'admin') {
+    window.history.pushState({}, '', '/')
+    window.dispatchEvent(new Event('history-state-changed'))
+  }
+
+  if (isDatabaseConfigPage && currentUser.role !== 'admin') {
+    window.history.pushState({}, '', '/')
+    window.dispatchEvent(new Event('history-state-changed'))
+  }
+
+  if (isKnowledgeDetailsPage && currentUser.permissions?.knowledgeDetails === false) {
+    window.history.pushState({}, '', '/')
+    window.dispatchEvent(new Event('history-state-changed'))
+  }
+
+  if (isDatabaseExplorerPage && currentUser.permissions?.databaseExplorer === false) {
+    window.history.pushState({}, '', '/')
+    window.dispatchEvent(new Event('history-state-changed'))
+  }
+
+  if (isAgentDetailsPage && currentUser.permissions?.agentDetails === false) {
+    window.history.pushState({}, '', '/')
+    window.dispatchEvent(new Event('history-state-changed'))
   }
 
   return (
+    <SidebarProvider defaultOpen>
+      <AppSidebar onLogout={handleLogout} currentUser={currentUser} />
+
+      <div className="flex flex-col justify-center flex-1 h-screen overflow-hidden">
+        <div
+          className={cn(
+            'flex flex-col max-w-4xl mx-auto relative w-full basis-[100vh] overflow-hidden',
+            'has-[.stick-to-bottom:empty]:overflow-visible has-[.stick-to-bottom:empty]:basis-[0px] transition-[flex-basis] duration-200',
+            isDetailsPage && 'max-w-6xl px-6 py-8 overflow-auto',
+          )}
+        >
+          {ready &&
+            (isAgentDetailsPage ? (
+              <AgentDetailsPage />
+            ) : isKnowledgeDetailsPage ? (
+              <KnowledgeDetailsPage />
+            ) : isDatabaseExplorerPage ? (
+              <DatabaseExplorerPage />
+            ) : isDatabaseConfigPage ? (
+              <DatabaseConfigPage />
+            ) : isAdminPage ? (
+              <AdminPage />
+            ) : (
+              <Chat />
+            ))}
+        </div>
+      </div>
+    </SidebarProvider>
+  )
+}
+
+export default function App() {
+  return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="system" storageKey="pydantic-chat-ui-theme">
-        {!isAuthenticated ? (
-          <LoginPage onLoginSuccess={() => setIsAuthenticated(true)} />
-        ) : (
-        <SidebarProvider defaultOpen>
-          <AppSidebar onLogout={handleLogout} />
-
-          <div className="flex flex-col justify-center flex-1 h-screen overflow-hidden">
-            <div
-              className={cn(
-                'flex flex-col max-w-4xl mx-auto relative w-full basis-[100vh] overflow-hidden',
-                'has-[.stick-to-bottom:empty]:overflow-visible has-[.stick-to-bottom:empty]:basis-[0px] transition-[flex-basis] duration-200',
-                isDetailsPage && 'max-w-6xl px-6 py-8 overflow-auto',
-              )}
-            >
-                {ready &&
-                  (isAgentDetailsPage ? <AgentDetailsPage /> : isKnowledgeDetailsPage ? <KnowledgeDetailsPage /> : isDatabaseExplorerPage ? <DatabaseExplorerPage /> : isDatabaseConfigPage ? <DatabaseConfigPage /> : <Chat />)}
-            </div>
-          </div>
-        </SidebarProvider>
-        )}
+        <UserProvider>
+          <AppContent />
+        </UserProvider>
       </ThemeProvider>
       <Toaster richColors />
     </QueryClientProvider>

@@ -43,7 +43,7 @@ function openDatabase(): Promise<IDBDatabase> {
   return dbPromise
 }
 
-export async function getConversations(): Promise<ConversationEntry[]> {
+export async function getConversations(userId?: string): Promise<ConversationEntry[]> {
   const db = await openDatabase()
   return new Promise((resolve, reject) => {
     const tx = db.transaction(CONVERSATIONS_STORE, 'readonly')
@@ -56,8 +56,10 @@ export async function getConversations(): Promise<ConversationEntry[]> {
     request.onsuccess = () => {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- IDB getAll() returns untyped data
       const conversations: ConversationEntry[] = request.result
-      conversations.sort((a, b) => b.timestamp - a.timestamp)
-      resolve(conversations)
+      // Filter by userId if provided
+      const filtered = userId ? conversations.filter((c) => (c as unknown as { userId?: string }).userId === userId) : conversations
+      filtered.sort((a, b) => b.timestamp - a.timestamp)
+      resolve(filtered)
     }
   })
 }

@@ -1,0 +1,14 @@
+{
+  "users": [
+    {
+      "id": "admin-001",
+      "username": "admin",
+      "email": "admin@example.com",
+      "password": "admin123",
+      "fullName": "Administrator",
+      "role": "admin",
+      "createdAt": "2024-01-01T00:00:00Z",
+      "lastLogin": null
+    }
+  ]
+}

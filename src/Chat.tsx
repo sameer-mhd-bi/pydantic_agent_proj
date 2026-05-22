@@ -27,6 +27,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useThrottle } from '@uidotdev/usehooks'
 import { nanoid } from 'nanoid'
 import { useConversationIdFromUrl } from './hooks/useConversationIdFromUrl'
+import { useAuth } from './components/user-provider'
 import { Part } from './Part'
 import type { ConversationEntry } from './types'
 import { getToolIcon } from '@/lib/tool-icons'
@@ -62,6 +63,7 @@ const Chat = () => {
   const { messages, sendMessage, status, setMessages, regenerate, error } = useChat()
   const throttledMessages = useThrottle(messages, 500)
   const [conversationId, setConversationId] = useConversationIdFromUrl()
+  const { currentUser } = useAuth()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Edit state
@@ -118,7 +120,7 @@ const Chat = () => {
         const newConversationId = `/${nanoid()}`
         setConversationId(newConversationId)
 
-        saveConversationEntry(newConversationId, input)
+        saveConversationEntry(newConversationId, input, undefined, currentUser?.id)
 
         theCurrentUrl.pathname = withBasePath(newConversationId)
         window.history.pushState({}, '', theCurrentUrl.toString())
@@ -127,7 +129,7 @@ const Chat = () => {
       sendMessage(
         { text: input },
         {
-          body: { model, builtinTools: enabledTools },
+          body: { model, builtinTools: enabledTools, userName: currentUser?.fullName },
         },
       ).catch((error: unknown) => {
         console.error('Error sending message:', error)
@@ -141,7 +143,7 @@ const Chat = () => {
     if (!pendingSendRef.current) return
     const pending = pendingSendRef.current
     pendingSendRef.current = null
-    sendMessage({ text: pending.text }, { body: { model: pending.model, builtinTools: pending.builtinTools } }).catch(
+    sendMessage({ text: pending.text }, { body: { model: pending.model, builtinTools: pending.builtinTools, userName: currentUser?.fullName } }).catch(
       (error: unknown) => {
         console.error('Error sending deferred message:', error)
       },
@@ -212,7 +214,7 @@ const Chat = () => {
     const firstMessage = originalText ?? pendingEdit.text
 
     // Save fork to IndexedDB
-    saveConversationEntry(newConversationId, firstMessage, { conversationId, messageIndex })
+    saveConversationEntry(newConversationId, firstMessage, { conversationId, messageIndex }, currentUser?.id)
     saveMessages(newConversationId, forkedMessages).catch((err: unknown) => {
       console.error('Failed to save forked messages:', err)
     })
@@ -299,6 +301,10 @@ const Chat = () => {
       <div className="sticky bottom-0 p-3">
         {messages.length === 0 && conversationId === '/' && (
           <div className="px-3 pb-6">
+            <h2 className="text-center text-3xl font-semibold tracking-tight text-foreground sm:text-3xl mb-2">
+              Hi {currentUser?.username ? currentUser.username.charAt(0).toUpperCase() + currentUser.username.slice(1) : ''} !
+            </h2>
+            
             <h2 className="text-center text-3xl font-semibold tracking-tight text-foreground sm:text-3xl">
               Start Interacting with Data Migration Assistant
             </h2>
@@ -410,7 +416,7 @@ export default Chat
 
 const MAX_FIRST_MESSAGE_LENGTH = 30
 
-function saveConversationEntry(newConversationId: string, firstMessage: string, forkOf?: ConversationEntry['forkOf']) {
+function saveConversationEntry(newConversationId: string, firstMessage: string, forkOf?: ConversationEntry['forkOf'], userId?: string) {
   const trimmedFirstMessage =
     firstMessage.length > MAX_FIRST_MESSAGE_LENGTH
       ? firstMessage.slice(0, MAX_FIRST_MESSAGE_LENGTH) + '...'
@@ -420,6 +426,7 @@ function saveConversationEntry(newConversationId: string, firstMessage: string, 
     id: newConversationId,
     firstMessage: trimmedFirstMessage,
     timestamp: Date.now(),
+    userId,
   }
   if (forkOf) {
     entry.forkOf = forkOf
