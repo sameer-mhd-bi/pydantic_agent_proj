@@ -7,3 +7,4 @@ sentence_transformers
 psycopg2
 snowflake-sqlalchemy
 petl
+openai

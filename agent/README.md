@@ -27,8 +27,6 @@ Then open your browser to `http://localhost:5173`.
 
 #below running cmd
 
-
-
 ### Both backend and FE should run 
 cd ai-chat-ui-main
 cd agent
@@ -37,4 +35,4 @@ cd agent
 Backend run --> uv run uvicorn chatbot.server:app --host 0.0.0.0 --port 38001 --env-file .env 
 cd ai-chat-ui-main
 
-Frontend run --- > pnpm run dev --host 0.0.0.0
+Frontend run --- > pnpm run dev --host 0.0.0.0 # if not working run above cmd

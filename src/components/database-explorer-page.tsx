@@ -1024,8 +1024,7 @@ export function DatabaseExplorerPage() {
           </h1>
 
           <p className="text-muted-foreground">
-            Connect to a PostgreSQL database and
-            explore its schema
+            AI-Powered Profiler — Connect to PostgreSQL and auto-discover your schema.
           </p>
         </div>
 
@@ -1081,22 +1080,24 @@ export function DatabaseExplorerPage() {
             className="font-mono text-sm"
           />
 
-          <Button
-            onClick={handleConnectClick}
-            disabled={
-              !connectionString.trim()
-            }
-            className="w-full sm:w-auto"
-          >
-            {databasesQuery.isLoading ? (
-              <>
-                <Loader className="mr-2 h-4 w-4 animate-spin" />
-                Connecting...
-              </>
-            ) : (
-              'Connect'
-            )}
-          </Button>
+          <div className="flex justify-end">
+            <Button
+              onClick={handleConnectClick}
+              disabled={
+                !connectionString.trim()
+              }
+              className="w-full sm:w-auto"
+            >
+              {databasesQuery.isLoading ? (
+                <>
+                  <Loader className="mr-2 h-4 w-4 animate-spin" />
+                  Connecting...
+                </>
+              ) : (
+                'Connect'
+              )}
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -1677,32 +1678,36 @@ export function DatabaseExplorerPage() {
       {/* Step 6 */}
       {selectedTables.length > 0 && (
         <div className="rounded-lg border bg-card p-6 shadow-sm space-y-4">
-          <div>
-            <h2 className="text-lg font-semibold mb-2">
-              Step 6: Column Mapping & Migration
-            </h2>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold mb-2">
+                Step 6: Column Mapping & Migration
+              </h2>
 
-            <p className="text-sm text-muted-foreground">
-              Map columns and select which
-              data to migrate to Snowflake
-            </p>
+              <p className="text-sm text-muted-foreground">
+                Map columns and select which
+                data to migrate to Snowflake
+              </p>
+            </div>
+
+            {columnMappings.length === 0 && (
+              <Button
+                onClick={handleGetColumnMappings}
+                disabled={isLoadingMappings}
+              >
+                {isLoadingMappings ? (
+                  <>
+                    <Loader className="mr-2 h-4 w-4 animate-spin" />
+                    Getting Mappings...
+                  </>
+                ) : (
+                  'Get Column Mappings'
+                )}
+              </Button>
+            )}
           </div>
 
-          {columnMappings.length === 0 ? (
-            <Button
-              onClick={handleGetColumnMappings}
-              disabled={isLoadingMappings}
-            >
-              {isLoadingMappings ? (
-                <>
-                  <Loader className="mr-2 h-4 w-4 animate-spin" />
-                  Getting Mappings...
-                </>
-              ) : (
-                'Get Column Mappings from Agent'
-              )}
-            </Button>
-          ) : (
+          {columnMappings.length > 0 && (
             <ColumnMappingViewer
               tables={columnMappings}
               onSelectColumn={

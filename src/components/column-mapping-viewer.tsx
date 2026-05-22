@@ -3,7 +3,6 @@ import { Loader, ChevronDown, ChevronUp, CheckCircle, XCircle } from 'lucide-rea
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
-import { toast } from 'sonner'
 
 interface ColumnMapping {
   source_column: string
@@ -84,13 +83,14 @@ export function ColumnMappingViewer({
     0,
   )
 
-  const handleSelectAllColumns = () => {
-    tables.forEach((table) => {
-      table.columns.forEach((col) => {
-        if (!table.selected_columns.includes(col.source_column)) {
-          onSelectColumn(table.table_name, col.source_column, true)
-        }
-      })
+
+  const handleTableSelectAll = (
+    tableName: string,
+    columns: ColumnMapping[],
+    checked: boolean,
+  ) => {
+    columns.forEach((col) => {
+      onSelectColumn(tableName, col.source_column, checked)
     })
   }
 
@@ -101,19 +101,10 @@ export function ColumnMappingViewer({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between text-sm">
+      <div className="flex items-center justify-start text-sm">
         <div className="text-muted-foreground">
           {selectedCount}/{totalColumns} column(s) selected
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleSelectAllColumns}
-          className="h-6 text-xs"
-          disabled={selectedCount === totalColumns}
-        >
-          Select All
-        </Button>
       </div>
 
       <div className="space-y-2">
@@ -155,7 +146,22 @@ export function ColumnMappingViewer({
               {isExpanded && (
                 <div className="bg-muted/20">
                   <div className="grid grid-cols-[40px_2fr_1.5fr_2fr_1.5fr] gap-3 p-3 text-xs font-medium text-muted-foreground border-b bg-muted/40">
-                    <div>Sel</div>
+                    <Checkbox
+                      checked={
+                        table.columns.length > 0 &&
+                        table.columns.every((col) =>
+                          table.selected_columns.includes(col.source_column)
+                        )
+                      }
+                      onCheckedChange={(checked) =>
+                        handleTableSelectAll(
+                          table.table_name,
+                          table.columns,
+                          checked as boolean,
+                        )
+                      }
+                      aria-label={`Select all columns for ${table.table_name}`}
+                    />
                     <div>Source Column</div>
                     <div>Source Type</div>
                     <div>Target Column</div>
@@ -257,23 +263,24 @@ export function ColumnMappingViewer({
         })}
       </div>
 
-      <Button
-        onClick={handleMigrateClick}
-        disabled={
-          isMigrating ||
-          selectedCount === 0
-        }
-        className="w-full"
-      >
-        {isMigrating ? (
-          <>
-            <Loader className="mr-2 h-4 w-4 animate-spin" />
-            Migrating...
-          </>
-        ) : (
-          'Start Migration'
-        )}
-      </Button>
+      <div className="flex justify-end">
+        <Button
+          onClick={handleMigrateClick}
+          disabled={
+            isMigrating ||
+            selectedCount === 0
+          }
+        >
+          {isMigrating ? (
+            <>
+              <Loader className="mr-2 h-4 w-4 animate-spin" />
+              Migrating...
+            </>
+          ) : (
+            'Start Migration'
+          )}
+        </Button>
+      </div>
 
       {migrationResults.length > 0 && (
         <div className="space-y-2 p-3 bg-muted/20 rounded-lg">

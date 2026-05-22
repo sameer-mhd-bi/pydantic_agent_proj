@@ -9,18 +9,15 @@ from typing import Any
 from urllib.parse import parse_qs, urlsplit, urlunsplit
 from dotenv import load_dotenv
 from pathlib import Path
+
+load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent / '.env', override=True)
+
 from starlette.responses import JSONResponse
 from starlette.requests import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic_ai import Agent
 from pydantic_ai.ui._web.api import ChatRequestExtra, validate_request_options
 from pydantic_ai.ui.vercel_ai import VercelAIAdapter
-
-from pydantic_ai.builtin_tools import (
-    CodeExecutionTool,
-    ImageGenerationTool,
-    WebSearchTool,
-)
 
 # Configure logger
 logger = logging.getLogger("server")
@@ -51,9 +48,6 @@ except ImportError:
     HAS_MCP_SERVER = False
 
 
-# Load environment variables from .env file
-load_dotenv()
-
 # 'if-token-present' means nothing will be sent (and the example will work) if you don't have logfire configured
 logfire.configure(send_to_logfire='if-token-present')
 logfire.instrument_pydantic_ai()
@@ -68,7 +62,7 @@ models={
         'GPT 4.1-mini': 'openai:gpt-4.1-mini', 
         'GPT 4.1-nano': 'openai:gpt-4.1-nano'}
 
-DEFAULT_ER_DIAGRAM_MODEL = models['GPT 5.2']
+DEFAULT_ER_DIAGRAM_MODEL = models['GPT 4.1']
 
 mermaid_diagram_agent = Agent(
     model=DEFAULT_ER_DIAGRAM_MODEL,

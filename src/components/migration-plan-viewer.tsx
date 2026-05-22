@@ -15,7 +15,6 @@ interface MigrationPlanViewerProps {
 }
 
 export function MigrationPlanViewer({
-  plan,
   editable,
   onEditableChange,
   onSave,
@@ -49,7 +48,7 @@ export function MigrationPlanViewer({
 
       // Add title
       pdf.setFontSize(16)
-      pdf.setFont(undefined, 'bold')
+      pdf.setFont('bold')
       pdf.text(
         'PostgreSQL to Snowflake Migration Plan',
         margin,
@@ -59,7 +58,7 @@ export function MigrationPlanViewer({
 
       // Add content with text wrapping
       pdf.setFontSize(11)
-      pdf.setFont(undefined, 'normal')
+      pdf.setFont('normal')
 
       const lines = pdf.splitTextToSize(
         editable,

@@ -140,7 +140,7 @@ def build_db_schema_memory():
 # DB SCHEMA → USER MEMORY
 # -------------------------------------------------------------------------
 db_schema_memory_data = build_db_schema_memory()
-print({"metadata": db_schema_memory_data[:5]})  # Print first 5 entries to verify
+# print({"metadata": db_schema_memory_data[:5]})  # Print first 5 entries to verify
 
 
 @dataclass
