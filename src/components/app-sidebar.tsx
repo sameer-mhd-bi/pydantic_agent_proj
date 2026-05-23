@@ -1,4 +1,4 @@
-import { BookOpen, CirclePlus, Database, FileText, LogOut, MessageCircle, Settings, Trash, UserCog } from 'lucide-react'
+import { BookOpen, CirclePlus, Database, FileText, LogOut, MessageCircle, Settings, Trash, UserCog, TrendingUp } from 'lucide-react'
 import type React from 'react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
@@ -84,9 +84,14 @@ function deleteConversation(conversationId: string) {
 
 export function AppSidebar({ onLogout, currentUser }: { onLogout: () => void; currentUser: User }) {
   const conversations = useConversations(currentUser.id)
-  const [conversationId] = useConversationIdFromUrl()
+  const [route] = useConversationIdFromUrl()
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [conversationToDelete, setConversationToDelete] = useState<ConversationEntry | null>(null)
+
+  const isActive = (path: string) => {
+    if (path === '/' && (route === '/' || route === '')) return true
+    return route === path
+  }
 
   const handleDeleteClick = (e: React.MouseEvent, conversation: ConversationEntry) => {
     e.preventDefault()
@@ -143,7 +148,7 @@ export function AppSidebar({ onLogout, currentUser }: { onLogout: () => void; cu
           <SidebarGroup>
             <SidebarMenu className="mb-2">
               <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Start a new conversation">
+                <SidebarMenuButton asChild tooltip="Start a new conversation" className={cn('hover:bg-black hover:text-white', isActive('/') && 'bg-black text-white')}>
                   <a href={withBasePath('/')} onClick={doLocalNavigation}>
                     <CirclePlus />
                     <span>New conversation</span>
@@ -152,7 +157,7 @@ export function AppSidebar({ onLogout, currentUser }: { onLogout: () => void; cu
               </SidebarMenuItem>
               {currentUser.permissions?.agentDetails !== false && (
               <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="View agent details">
+                <SidebarMenuButton asChild tooltip="View agent details" className={cn('hover:bg-black hover:text-white', isActive('/agent-details') && 'bg-black text-white')}>
                   <a href={withBasePath('/agent-details')} onClick={doLocalNavigation}>
                     <FileText />
                     <span>Agent details</span>
@@ -162,7 +167,7 @@ export function AppSidebar({ onLogout, currentUser }: { onLogout: () => void; cu
               )}
               {currentUser.permissions?.knowledgeDetails !== false && (
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="View knowledge logic">
+                  <SidebarMenuButton asChild tooltip="View knowledge logic" className={cn('hover:bg-black hover:text-white', isActive('/knowledge-details') && 'bg-black text-white')}>
                     <a href={withBasePath('/knowledge-details')} onClick={doLocalNavigation}>
                       <BookOpen />
                       <span>Knowledge details</span>
@@ -172,7 +177,7 @@ export function AppSidebar({ onLogout, currentUser }: { onLogout: () => void; cu
               )}
               {currentUser.permissions?.databaseExplorer !== false && (
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Explore database schema">
+                  <SidebarMenuButton asChild tooltip="Explore database schema" className={cn('hover:bg-black hover:text-white', isActive('/database-explorer') && 'bg-black text-white')}>
                     <a href={withBasePath('/database-explorer')} onClick={doLocalNavigation}>
                       <Database />
                       <span>Database Profiler</span>
@@ -182,7 +187,7 @@ export function AppSidebar({ onLogout, currentUser }: { onLogout: () => void; cu
               )}
               {currentUser.role === 'admin' && (
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Configure databases">
+                  <SidebarMenuButton asChild tooltip="Configure databases" className={cn('hover:bg-black hover:text-white', isActive('/database-config') && 'bg-black text-white')}>
                     <a href={withBasePath('/database-config')} onClick={doLocalNavigation}>
                       <Settings />
                       <span>Database Config</span>
@@ -192,7 +197,7 @@ export function AppSidebar({ onLogout, currentUser }: { onLogout: () => void; cu
               )}
               {currentUser.role === 'admin' && (
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Manage users">
+                  <SidebarMenuButton asChild tooltip="Manage users" className={cn('hover:bg-black hover:text-white', isActive('/admin') && 'bg-black text-white')}>
                     <a href={withBasePath('/admin')} onClick={doLocalNavigation}>
                       <UserCog />
                       <span>Admin Panel</span>
@@ -200,6 +205,14 @@ export function AppSidebar({ onLogout, currentUser }: { onLogout: () => void; cu
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               )}
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="View migration statistics" className={cn('hover:bg-black hover:text-white', isActive('/migration-dashboard') && 'bg-black text-white')}>
+                  <a href={withBasePath('/migration-dashboard')} onClick={doLocalNavigation}>
+                    <TrendingUp />
+                    <span>Migration Dashboard</span>
+                  </a>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
 
             <div className="px-2 pt-3 group-data-[state=collapsed]:hidden">
@@ -214,12 +227,12 @@ export function AppSidebar({ onLogout, currentUser }: { onLogout: () => void; cu
                 {conversations.map((conversation, index) => (
                   <SidebarMenuItem key={index} className="group/sidebar-menu-item">
                     <div className="flex items-center gap-1 h-auto">
-                      <SidebarMenuButton asChild tooltip={conversation.firstMessage} className="flex-1">
+                      <SidebarMenuButton asChild tooltip={conversation.firstMessage} className="flex-1 hover:bg-black hover:text-white">
                         <a
                           href={withBasePath(conversation.id)}
                           onClick={doLocalNavigation}
                           className={cn('h-auto flex items-start gap-2', {
-                            'bg-accent pointer-events-none': conversation.id === conversationId,
+                            'bg-black pointer-events-none': conversation.id === route,
                           })}
                         >
                           <MessageCircle className="size-3 mt-1" />

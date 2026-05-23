@@ -4,7 +4,7 @@
     "port": 5432,
     "user": "postgres",
     "password": "root",
-    "dbname": "ai"
+    "dbname": "bank_db"
   },
   "snowflake": {
     "account": "bxvclfn-jn77484",
@@ -12,6 +12,6 @@
     "warehouse": "DA_DWH",
     "database": "dev_dwh",
     "schema": "staging",
-    "key_path": "C:\\Users\\sameer.mohammed\\Downloads\\rsa_key.pem"
+    "key_path": "C:\\Users\\remote\\Mar_2026\\rsa_key.pem"
   }
 }

@@ -3,6 +3,8 @@ import { Loader, ChevronDown, ChevronUp, CheckCircle, XCircle } from 'lucide-rea
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
+import { incrementMigrations } from '@/lib/migration-stats'
+import type { User } from '@/types/user'
 
 interface ColumnMapping {
   source_column: string
@@ -48,6 +50,7 @@ interface ColumnMappingViewerProps {
   ) => void
   onMigrate: (tables: TableMapping[]) => Promise<void>
   isMigrating: boolean
+  currentUser?: User | null
 }
 
 export function ColumnMappingViewer({
@@ -57,6 +60,7 @@ export function ColumnMappingViewer({
   onTargetColumnChange,
   onMigrate,
   isMigrating,
+  currentUser,
 }: ColumnMappingViewerProps) {
   const [expandedTables, setExpandedTables] =
     useState<string[]>([])
@@ -96,7 +100,13 @@ export function ColumnMappingViewer({
 
   const handleMigrateClick = async () => {
     setMigrationResults([])
-    await onMigrate(tables)
+    try {
+      await onMigrate(tables)
+      const selectedTablesCount = tables.filter(t => t.selected_columns.length > 0).length
+      incrementMigrations(selectedTablesCount, currentUser?.id, currentUser?.fullName)
+    } catch (error) {
+      console.error('Migration error:', error)
+    }
   }
 
   return (

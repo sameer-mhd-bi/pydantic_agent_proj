@@ -109,7 +109,7 @@ function EditableDetailsSection({
           ) : (
             <Button
               size="sm"
-              variant="outline"
+              variant="default"
               onClick={() => setIsEditing(true)}
             >
               Edit

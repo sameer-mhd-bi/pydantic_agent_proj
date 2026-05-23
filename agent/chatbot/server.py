@@ -30,6 +30,8 @@ from .database_config import (
     get_snowflake_config,
     update_database_config,
     get_default_config,
+    test_postgresql_connection,
+    test_snowflake_connection,
 )
 
 import sys
@@ -718,6 +720,40 @@ async def database_config_reset_endpoint(request: Request):
         )
 
 
+async def database_config_test_postgresql_endpoint(request: Request):
+    """Test PostgreSQL database connection."""
+    try:
+        payload = json.loads((await request.body()) or b'{}')
+        pg_config = payload.get('postgresql')
+        result = test_postgresql_connection(pg_config)
+        logger.info(f"PostgreSQL connection test: {result}")
+        return JSONResponse(result)
+    except Exception as e:
+        error_msg = str(e)
+        logger.error(f"Error testing PostgreSQL connection: {error_msg}")
+        return JSONResponse(
+            {'success': False, 'error': f'Connection test error: {error_msg}'}, 
+            status_code=200
+        )
+
+
+async def database_config_test_snowflake_endpoint(request: Request):
+    """Test Snowflake database connection."""
+    try:
+        payload = json.loads((await request.body()) or b'{}')
+        sf_config = payload.get('snowflake')
+        result = test_snowflake_connection(sf_config)
+        logger.info(f"Snowflake connection test: {result}")
+        return JSONResponse(result)
+    except Exception as e:
+        error_msg = str(e)
+        logger.error(f"Error testing Snowflake connection: {error_msg}")
+        return JSONResponse(
+            {'success': False, 'error': f'Connection test error: {error_msg}'}, 
+            status_code=200
+        )
+
+
 async def save_agent_details_endpoint(request: Request):
     """Save edited agent detail fields and database configuration."""
     try:
@@ -996,6 +1032,10 @@ class AgentDetailsMiddleware(BaseHTTPMiddleware):
             return await database_config_endpoint(request)
         if request.url.path == '/api/database-config/reset' and request.method == 'POST':
             return await database_config_reset_endpoint(request)
+        if request.url.path == '/api/database-config/test-postgresql' and request.method == 'POST':
+            return await database_config_test_postgresql_endpoint(request)
+        if request.url.path == '/api/database-config/test-snowflake' and request.method == 'POST':
+            return await database_config_test_snowflake_endpoint(request)
         if request.url.path == '/api/knowledge-details' and request.method == 'GET':
             return await knowledge_details_endpoint(request)
         if request.url.path == '/api/knowledge-collections' and request.method == 'GET':

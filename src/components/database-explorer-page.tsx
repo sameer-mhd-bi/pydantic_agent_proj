@@ -1104,6 +1104,12 @@ export function DatabaseExplorerPage() {
               )}
             </Button>
           </div>
+
+          {databasesQuery.isError && (
+            <div className="rounded border border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950 p-3 text-sm text-red-800 dark:text-red-200">
+              <strong>Connection Error:</strong> {databasesQuery.error instanceof Error ? databasesQuery.error.message : 'Failed to connect to the database'}
+            </div>
+          )}
         </div>
       </div>
 
@@ -1727,6 +1733,7 @@ export function DatabaseExplorerPage() {
               }
               onMigrate={handleMigrateData}
               isMigrating={isMigrating}
+              currentUser={currentUser}
             />
           )}
         </div>

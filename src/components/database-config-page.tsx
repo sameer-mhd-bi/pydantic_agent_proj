@@ -3,7 +3,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
-import { AlertCircle, CheckCircle2, RotateCcw, Save } from 'lucide-react'
+import { AlertCircle, CheckCircle2, RotateCcw, Save, Zap } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
 interface DatabaseConfig {
@@ -65,14 +65,78 @@ async function resetDatabaseConfig(): Promise<DatabaseConfig> {
   return response.json().then((data) => data.config)
 }
 
+async function testPostgresqlConnection(pgConfig: any): Promise<{ success: boolean; error?: string }> {
+  const response = await fetch('/api/database-config/test-postgresql', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ postgresql: pgConfig }),
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.detail || 'Failed to test PostgreSQL connection')
+  }
+
+  return response.json()
+}
+
+async function testSnowflakeConnection(sfConfig: any): Promise<{ success: boolean; error?: string }> {
+  const response = await fetch('/api/database-config/test-snowflake', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ snowflake: sfConfig }),
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.detail || 'Failed to test Snowflake connection')
+  }
+
+  return response.json()
+}
+
 export function DatabaseConfigPage() {
   const [config, setConfig] = useState<DatabaseConfig | null>(null)
   const [hasChanges, setHasChanges] = useState(false)
+  const [postgresStatus, setPostgresStatus] = useState<{ success: boolean; error?: string } | null>(null)
+  const [snowflakeStatus, setSnowflakeStatus] = useState<{ success: boolean; error?: string } | null>(null)
 
   // Fetch initial configuration
   const configQuery = useQuery({
     queryKey: ['database-config'],
     queryFn: getDatabaseConfig,
+  })
+
+  // Test PostgreSQL connection mutation
+  const testPostgresMutation = useMutation({
+    mutationFn: () => testPostgresqlConnection(config?.postgresql),
+    onSuccess: (status) => {
+      setPostgresStatus(status)
+      if (status.success) {
+        toast.success('✓ PostgreSQL connection successful')
+      } else {
+        toast.error(`PostgreSQL connection failed: ${status.error}`)
+      }
+    },
+    onError: (error) => {
+      toast.error(`Test failed: ${error.message}`)
+    },
+  })
+
+  // Test Snowflake connection mutation
+  const testSnowflakeMutation = useMutation({
+    mutationFn: () => testSnowflakeConnection(config?.snowflake),
+    onSuccess: (status) => {
+      setSnowflakeStatus(status)
+      if (status.success) {
+        toast.success('✓ Snowflake connection successful')
+      } else {
+        toast.error(`Snowflake connection failed: ${status.error}`)
+      }
+    },
+    onError: (error) => {
+      toast.error(`Test failed: ${error.message}`)
+    },
   })
 
   // Save configuration mutation
@@ -274,6 +338,25 @@ export function DatabaseConfigPage() {
             </div>
           </div>
         </div>
+
+        {postgresStatus && !postgresStatus.success && (
+          <Alert className="bg-red-50 border-red-200">
+            <AlertCircle className="h-4 w-4 text-red-600" />
+            <AlertDescription className="text-red-800"><strong>Connection Error:</strong> {postgresStatus.error}</AlertDescription>
+          </Alert>
+        )}
+
+        <div className="flex justify-end">
+          <Button
+            size="sm"
+            variant="default"
+            onClick={() => testPostgresMutation.mutate()}
+            disabled={testPostgresMutation.isPending || saveMutation.isPending}
+          >
+            <Zap className="mr-2 h-4 w-4" />
+            {testPostgresMutation.isPending ? 'Testing...' : 'Test'}
+          </Button>
+        </div>
       </div>
 
       {/* Snowflake Configuration */}
@@ -345,6 +428,25 @@ export function DatabaseConfigPage() {
               />
             </div>
           </div>
+        </div>
+
+        {snowflakeStatus && !snowflakeStatus.success && (
+          <Alert className="bg-red-50 border-red-200">
+            <AlertCircle className="h-4 w-4 text-red-600" />
+            <AlertDescription className="text-red-800"><strong>Connection Error:</strong> {snowflakeStatus.error}</AlertDescription>
+          </Alert>
+        )}
+
+        <div className="flex justify-end">
+          <Button
+            size="sm"
+            variant="default"
+            onClick={() => testSnowflakeMutation.mutate()}
+            disabled={testSnowflakeMutation.isPending || saveMutation.isPending}
+          >
+            <Zap className="mr-2 h-4 w-4" />
+            {testSnowflakeMutation.isPending ? 'Testing...' : 'Test'}
+          </Button>
         </div>
       </div>
 
