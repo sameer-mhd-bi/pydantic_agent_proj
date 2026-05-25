@@ -1,3 +1,14 @@
+export interface TableMigrationDetail {
+  tableName: string
+  sourceDatabase: string
+  targetDatabase: string
+  rowsMigrated: number
+  columnsCount: number
+  timestamp: string
+  status: 'success' | 'failed'
+  error?: string
+}
+
 export interface MigrationRecord {
   id: string
   timestamp: string
@@ -5,6 +16,7 @@ export interface MigrationRecord {
   userName: string
   schemasCount: number
   tablesCount: number
+  tables?: TableMigrationDetail[]
 }
 
 export interface MigrationStats {
@@ -15,6 +27,7 @@ export interface MigrationStats {
 }
 
 const STATS_KEY = 'migration-stats'
+const TABLES_MIGRATION_KEY = 'migration-tables'
 
 export function getMigrationStats(): MigrationStats {
   const stored = localStorage.getItem(STATS_KEY)
@@ -37,7 +50,56 @@ function getDefaultStats(): MigrationStats {
   }
 }
 
-export function incrementMigrations(schemasCount: number = 1, userId?: string, userName?: string): MigrationStats {
+export function recordSuccessfulTableMigration(
+  tableName: string,
+  sourceDatabase: string,
+  targetDatabase: string,
+  rowsMigrated: number,
+  columnsCount: number,
+): TableMigrationDetail {
+  const detail: TableMigrationDetail = {
+    tableName,
+    sourceDatabase,
+    targetDatabase,
+    rowsMigrated,
+    columnsCount,
+    timestamp: new Date().toISOString(),
+    status: 'success',
+  }
+  
+  try {
+    // Store table migration details
+    const tablesMigrations = getTablesMigrationHistory()
+    if (Array.isArray(tablesMigrations)) {
+      tablesMigrations.push(detail)
+      localStorage.setItem(TABLES_MIGRATION_KEY, JSON.stringify(tablesMigrations))
+    }
+  } catch (error) {
+    console.error('Failed to record table migration:', error)
+  }
+  
+  return detail
+}
+
+export function getTablesMigrationHistory(): TableMigrationDetail[] {
+  try {
+    const stored = localStorage.getItem(TABLES_MIGRATION_KEY)
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      return Array.isArray(parsed) ? parsed : []
+    }
+  } catch {
+    // Silent fail on parse error
+  }
+  return []
+}
+
+export function incrementMigrations(
+  schemasCount: number = 1,
+  userId?: string,
+  userName?: string,
+  tables?: TableMigrationDetail[],
+): MigrationStats {
   const stats = getMigrationStats()
   stats.totalMigrations += 1
   stats.schemasAnalyzed += schemasCount
@@ -50,11 +112,17 @@ export function incrementMigrations(schemasCount: number = 1, userId?: string, u
     userName: userName || 'Unknown User',
     schemasCount,
     tablesCount: schemasCount,
+    tables: tables || [],
   }
   
   stats.records.push(record)
   localStorage.setItem(STATS_KEY, JSON.stringify(stats))
-  window.dispatchEvent(new Event('migration-stats-updated'))
+  
+  // Dispatch event with a small delay to ensure storage is complete
+  setTimeout(() => {
+    window.dispatchEvent(new CustomEvent('migration-stats-updated', { detail: stats }))
+  }, 100)
+  
   return stats
 }
 
@@ -65,5 +133,96 @@ export function getMigrationsByUser(userId: string): MigrationRecord[] {
 
 export function resetStats(): void {
   localStorage.removeItem(STATS_KEY)
-  window.dispatchEvent(new Event('migration-stats-updated'))
+  localStorage.removeItem(TABLES_MIGRATION_KEY)
+  setTimeout(() => {
+    window.dispatchEvent(new CustomEvent('migration-stats-updated', { detail: getDefaultStats() }))
+  }, 100)
+}
+
+export async function syncToFile(): Promise<void> {
+  const stats = getMigrationStats()
+  const tablesMigrations = getTablesMigrationHistory()
+  
+  const data = {
+    version: '1.0',
+    lastUpdated: new Date().toISOString(),
+    totalMigrations: stats.totalMigrations,
+    schemasAnalyzed: stats.schemasAnalyzed,
+    records: stats.records,
+    tableMigrations: tablesMigrations,
+  }
+  
+  try {
+    const response = await fetch('/api/migration-history', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    
+    if (!response.ok) {
+      console.error('Failed to sync migration history:', response.statusText)
+    }
+  } catch (error) {
+    console.error('Failed to sync migration history to file:', error)
+  }
+}
+
+export function downloadMigrationHistory(): void {
+  const stats = getMigrationStats()
+  const tablesMigrations = getTablesMigrationHistory()
+  
+  const data = {
+    version: '1.0',
+    exportedAt: new Date().toISOString(),
+    totalMigrations: stats.totalMigrations,
+    schemasAnalyzed: stats.schemasAnalyzed,
+    records: stats.records,
+    tableMigrations: tablesMigrations,
+  }
+  
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `migration-history-${new Date().getTime()}.json`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+export async function fetchMigrationHistory(): Promise<MigrationStats | null> {
+  try {
+    console.log('Fetching migration history from /api/migration-history')
+    const response = await fetch('/api/migration-history', {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    })
+    
+    console.log('Migration history response status:', response.status)
+    
+    if (!response.ok) {
+      console.error('Failed to fetch migration history. Status:', response.status, response.statusText)
+      const errorText = await response.text()
+      console.error('Response body:', errorText)
+      return null
+    }
+
+    const data = await response.json()
+    console.log('Fetched migration data:', data)
+    
+    if (!data) {
+      return getDefaultStats()
+    }
+
+    return {
+      totalMigrations: data.totalMigrations || 0,
+      schemasAnalyzed: data.schemasAnalyzed || 0,
+      lastUpdated: data.lastUpdated || new Date().toISOString(),
+      records: Array.isArray(data.records) ? data.records : [],
+    }
+  } catch (error) {
+    console.error('Error fetching migration history:', error)
+    return null
+  }
 }

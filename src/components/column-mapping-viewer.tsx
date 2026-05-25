@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Loader, ChevronDown, ChevronUp, CheckCircle, XCircle } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Loader, CheckCircle, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
@@ -51,6 +51,7 @@ interface ColumnMappingViewerProps {
   onMigrate: (tables: TableMapping[]) => Promise<void>
   isMigrating: boolean
   currentUser?: User | null
+  expandAll?: boolean
 }
 
 export function ColumnMappingViewer({
@@ -61,11 +62,21 @@ export function ColumnMappingViewer({
   onMigrate,
   isMigrating,
   currentUser,
+  expandAll,
 }: ColumnMappingViewerProps) {
   const [expandedTables, setExpandedTables] =
     useState<string[]>([])
   const [migrationResults, setMigrationResults] =
     useState<MigrationResult[]>([])
+
+  // Handle expand all / collapse all
+  useEffect(() => {
+    if (expandAll) {
+      setExpandedTables(tables.map((t) => t.table_name))
+    } else {
+      setExpandedTables([])
+    }
+  }, [expandAll, tables])
 
   const toggleTableExpand = (table: string) => {
     setExpandedTables((prev) =>
@@ -139,11 +150,9 @@ export function ColumnMappingViewer({
                 }
                 className="w-full flex items-center gap-2 p-2 hover:bg-muted bg-card transition-colors"
               >
-                {isExpanded ? (
-                  <ChevronUp className="h-4 w-4" />
-                ) : (
-                  <ChevronDown className="h-4 w-4" />
-                )}
+                <span className="text-lg">
+                  {isExpanded ? '−' : '+'}
+                </span>
                 <span className="text-sm font-semibold">
                   {table.table_name}
                 </span>
@@ -155,7 +164,7 @@ export function ColumnMappingViewer({
 
               {isExpanded && (
                 <div className="bg-muted/20">
-                  <div className="grid grid-cols-[40px_2fr_1.5fr_2fr_1.5fr] gap-3 p-3 text-xs font-medium text-muted-foreground border-b bg-muted/40">
+                  <div className="grid grid-cols-[40px_2fr_1.5fr_2fr_1.5fr] gap-3 p-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground border-b bg-muted">
                     <Checkbox
                       checked={
                         table.columns.length > 0 &&
@@ -172,10 +181,10 @@ export function ColumnMappingViewer({
                       }
                       aria-label={`Select all columns for ${table.table_name}`}
                     />
-                    <div>Source Column</div>
-                    <div>Source Type</div>
-                    <div>Target Column</div>
-                    <div>Target Type</div>
+                    <div className="text-muted-foreground">Source Column</div>
+                    <div className="text-muted-foreground">Source Type</div>
+                    <div className="text-muted-foreground">Target Column</div>
+                    <div className="text-muted-foreground">Target Type</div>
                   </div>
                   {table.columns.map(
                     (col) => {

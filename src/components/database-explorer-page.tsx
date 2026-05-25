@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import mermaid from 'mermaid'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import {
   Select,
   SelectContent,
@@ -21,6 +20,7 @@ import { useAuth } from './user-provider'
 import { MigrationPlanViewer } from '@/components/migration-plan-viewer'
 import { ColumnMappingViewer } from '@/components/column-mapping-viewer'
 import { logError } from '@/lib/error-logger'
+import { recordSuccessfulTableMigration, incrementMigrations, syncToFile } from '@/lib/migration-stats'
 
 interface DatabaseInfo {
   name: string
@@ -276,6 +276,10 @@ export function DatabaseExplorerPage() {
   
   // Helper function to create user-specific storage keys
   const getStorageKey = (key: string) => `${currentUser?.id || 'guest'}-${key}`
+  
+  // Helper function to create database-specific storage keys
+  const getDatabaseStorageKey = (key: string, database: string) => 
+    database ? `${getStorageKey(key)}-db-${database}` : getStorageKey(key)
 
   const [connectionString, setConnectionString] =
     useState('')
@@ -283,10 +287,8 @@ export function DatabaseExplorerPage() {
   const [selectedDatabase, setSelectedDatabase] =
     useState<string>('')
 
-  const [
-    hasAttemptedConnection,
-    setHasAttemptedConnection,
-  ] = useState(false)
+  const [isLoadingConnection, setIsLoadingConnection] =
+    useState(true)
 
   const [mermaidCode, setMermaidCode] =
     useState<string>('')
@@ -333,99 +335,88 @@ export function DatabaseExplorerPage() {
   const [hasAutoSelectedTables, setHasAutoSelectedTables] =
     useState(false)
 
+  const [expandAllColumns, setExpandAllColumns] =
+    useState(false)
+
   const [isMigrating, setIsMigrating] =
     useState(false)
 
   const diagramContainerRef =
     useRef<HTMLDivElement | null>(null)
 
-  // Load persisted state
-  // Load persisted state
+  // Load connection from database config
+  useEffect(() => {
+    const loadConnection = async () => {
+      try {
+        const response = await fetch('/api/database-config')
+        if (response.ok) {
+          const config = await response.json()
+          const pgConfig = config.postgresql
+          const connStr = `postgresql://${pgConfig.user}:${pgConfig.password}@${pgConfig.host}:${pgConfig.port}/${pgConfig.dbname}`
+          setConnectionString(connStr)
+        }
+      } catch (error) {
+        console.error('Failed to load database config:', error)
+      } finally {
+        setIsLoadingConnection(false)
+      }
+    }
+    
+    loadConnection()
+  }, [])
+
+  // Restore persisted state early on mount before queries run
   useEffect(() => {
     if (!currentUser?.id) return
-    
-    const savedConnectionString =
-      localStorage.getItem(
-        getStorageKey('db-explorer-connection'),
-      )
 
     const savedDatabase = localStorage.getItem(
       getStorageKey('db-explorer-database'),
     )
+    
+    if (savedDatabase) {
+      setSelectedDatabase(savedDatabase)
 
-    const savedAttempted =
-      localStorage.getItem(
-        getStorageKey('db-explorer-attempted'),
+      const savedSelectedTables = localStorage.getItem(
+        getDatabaseStorageKey('db-explorer-selected-tables', savedDatabase),
       )
+      if (savedSelectedTables) {
+        try {
+          setSelectedTables(JSON.parse(savedSelectedTables))
+        } catch {
+          setSelectedTables([])
+        }
+      }
+
+      const savedExpandedTables = localStorage.getItem(
+        getDatabaseStorageKey('db-explorer-expanded-tables', savedDatabase),
+      )
+      if (savedExpandedTables) {
+        try {
+          setExpandedTables(JSON.parse(savedExpandedTables))
+        } catch {
+          setExpandedTables([])
+        }
+      }
+    }
 
     const savedMermaid = localStorage.getItem(
       getStorageKey('db-explorer-mermaid'),
     )
-
-    const savedMigrationPlan =
-      localStorage.getItem(
-        getStorageKey('db-explorer-migration-plan'),
-      )
-
-    const savedSelectedTables =
-      localStorage.getItem(
-        getStorageKey('db-explorer-selected-tables'),
-      )
-
-    const savedExpandedTables =
-      localStorage.getItem(
-        getStorageKey('db-explorer-expanded-tables'),
-      )
-
-    const savedColumnMappings =
-      localStorage.getItem(
-        getStorageKey('db-explorer-column-mappings'),
-      )
-
-    const savedHasAutoSelected =
-      localStorage.getItem(
-        getStorageKey('db-explorer-has-auto-selected'),
-      )
-
-    if (savedConnectionString) {
-      setConnectionString(savedConnectionString)
-    }
-
-    if (savedDatabase) {
-      setSelectedDatabase(savedDatabase)
-    }
-
-    if (savedAttempted === 'true') {
-      setHasAttemptedConnection(true)
-    }
-
     if (savedMermaid) {
       setMermaidCode(savedMermaid)
     }
 
+    const savedMigrationPlan = localStorage.getItem(
+      getStorageKey('db-explorer-migration-plan'),
+    )
     if (savedMigrationPlan) {
       setMigrationPlan(savedMigrationPlan)
-      setMigrationPlanEditable(
-        savedMigrationPlan,
-      )
+      setMigrationPlanEditable(savedMigrationPlan)
     }
 
-    if (savedSelectedTables) {
-      try {
-        setSelectedTables(JSON.parse(savedSelectedTables))
-      } catch {
-        setSelectedTables([])
-      }
-    }
-
-    if (savedExpandedTables) {
-      try {
-        setExpandedTables(JSON.parse(savedExpandedTables))
-      } catch {
-        setExpandedTables([])
-      }
-    }
-
+    const savedColumnMappings = savedDatabase ? localStorage.getItem(
+      getDatabaseStorageKey('db-explorer-column-mappings', savedDatabase),
+    ) : null
     if (savedColumnMappings) {
       try {
         setColumnMappings(JSON.parse(savedColumnMappings))
@@ -434,6 +425,9 @@ export function DatabaseExplorerPage() {
       }
     }
 
+    const savedHasAutoSelected = localStorage.getItem(
+      getStorageKey('db-explorer-has-auto-selected'),
+    )
     if (savedHasAutoSelected === 'true') {
       setHasAutoSelectedTables(true)
     }
@@ -441,13 +435,40 @@ export function DatabaseExplorerPage() {
     setIsStateRestored(true)
   }, [currentUser?.id])
 
+  // Restore database-specific selections when database changes (manual user change only)
   useEffect(() => {
-    if (!currentUser?.id) return
-    localStorage.setItem(
-      getStorageKey('db-explorer-connection'),
-      connectionString,
+    if (!currentUser?.id || !selectedDatabase || !isStateRestored) return
+
+    const savedSelectedTables = localStorage.getItem(
+      getDatabaseStorageKey('db-explorer-selected-tables', selectedDatabase),
     )
-  }, [connectionString, currentUser?.id])
+
+    const savedExpandedTables = localStorage.getItem(
+      getDatabaseStorageKey('db-explorer-expanded-tables', selectedDatabase),
+    )
+
+    if (savedSelectedTables) {
+      try {
+        setSelectedTables(JSON.parse(savedSelectedTables))
+      } catch {
+        setSelectedTables([])
+      }
+    } else {
+      setSelectedTables([])
+    }
+
+    if (savedExpandedTables) {
+      try {
+        setExpandedTables(JSON.parse(savedExpandedTables))
+      } catch {
+        setExpandedTables([])
+      }
+    } else {
+      setExpandedTables([])
+    }
+
+    setHasAutoSelectedTables(false)
+  }, [currentUser?.id, selectedDatabase, isStateRestored])
 
   useEffect(() => {
     if (!currentUser?.id) return
@@ -456,14 +477,6 @@ export function DatabaseExplorerPage() {
       selectedDatabase,
     )
   }, [selectedDatabase, currentUser?.id])
-
-  useEffect(() => {
-    if (!currentUser?.id) return
-    localStorage.setItem(
-      getStorageKey('db-explorer-attempted'),
-      String(hasAttemptedConnection),
-    )
-  }, [hasAttemptedConnection, currentUser?.id])
 
   useEffect(() => {
     if (!currentUser?.id) return
@@ -486,28 +499,28 @@ export function DatabaseExplorerPage() {
   }, [migrationPlan, currentUser?.id])
 
   useEffect(() => {
-    if (!currentUser?.id) return
+    if (!currentUser?.id || !selectedDatabase) return
     localStorage.setItem(
-      getStorageKey('db-explorer-selected-tables'),
+      getDatabaseStorageKey('db-explorer-selected-tables', selectedDatabase),
       JSON.stringify(selectedTables),
     )
-  }, [selectedTables, currentUser?.id])
+  }, [selectedTables, currentUser?.id, selectedDatabase])
 
   useEffect(() => {
-    if (!currentUser?.id) return
+    if (!currentUser?.id || !selectedDatabase) return
     localStorage.setItem(
-      getStorageKey('db-explorer-expanded-tables'),
+      getDatabaseStorageKey('db-explorer-expanded-tables', selectedDatabase),
       JSON.stringify(expandedTables),
     )
-  }, [expandedTables, currentUser?.id])
+  }, [expandedTables, currentUser?.id, selectedDatabase])
 
   useEffect(() => {
-    if (!currentUser?.id) return
+    if (!currentUser?.id || !selectedDatabase) return
     localStorage.setItem(
-      getStorageKey('db-explorer-column-mappings'),
+      getDatabaseStorageKey('db-explorer-column-mappings', selectedDatabase),
       JSON.stringify(columnMappings),
     )
-  }, [columnMappings, currentUser?.id])
+  }, [columnMappings, currentUser?.id, selectedDatabase])
 
   useEffect(() => {
     if (!currentUser?.id) return
@@ -596,7 +609,7 @@ export function DatabaseExplorerPage() {
 
     enabled:
       connectionString.length > 0 &&
-      hasAttemptedConnection,
+      !isLoadingConnection,
 
     retry: 1,
   })
@@ -628,7 +641,6 @@ export function DatabaseExplorerPage() {
     retry: 1,
   })
 
-  // Auto select all tables only on first load
   // Auto select all tables only on first load when no saved selection exists
   useEffect(() => {
     if (
@@ -637,9 +649,9 @@ export function DatabaseExplorerPage() {
       !hasAutoSelectedTables &&
       selectedDatabase
     ) {
-      // Check if there's saved selection in localStorage
+      // Check if there's saved selection in localStorage for this database
       const savedSelectedTables = localStorage.getItem(
-        getStorageKey('db-explorer-selected-tables'),
+        getDatabaseStorageKey('db-explorer-selected-tables', selectedDatabase),
       )
       
       // Only auto-select if no saved selection exists AND we haven't auto-selected before
@@ -824,52 +836,12 @@ export function DatabaseExplorerPage() {
     },
   })
 
-  const handleConnectClick = () => {
-    if (!connectionString.trim()) {
-      toast.error(
-        'Please enter a connection string',
-      )
-
-      return
-    }
-
-    setHasAttemptedConnection(true)
-    setSelectedDatabase('')
-    setSelectedTables([])
-    setExpandedTables([])
-    setMermaidCode('')
-    setMermaidSvg('')
-    setMigrationPlan('')
-    setMigrationPlanEditable('')
-    setHasAutoSelectedTables(false)
-
-    localStorage.removeItem(
-      getStorageKey('db-explorer-mermaid'),
-    )
-
-    localStorage.removeItem(
-      getStorageKey('db-explorer-migration-plan'),
-    )
-
-    localStorage.removeItem(
-      getStorageKey('db-explorer-has-auto-selected'),
-    )
-  }
-
   const handleClearHistory = () => {
-    localStorage.removeItem(
-      getStorageKey('db-explorer-connection'),
-    )
-
     localStorage.removeItem(
       getStorageKey('db-explorer-database'),
     )
 
     localStorage.removeItem(
-      getStorageKey('db-explorer-attempted'),
-    )
-
-    localStorage.removeItem(
       getStorageKey('db-explorer-mermaid'),
     )
 
@@ -881,11 +853,18 @@ export function DatabaseExplorerPage() {
       getStorageKey('db-explorer-has-auto-selected'),
     )
 
-    setConnectionString('')
+    // Clear database-specific selections for all databases
+    const keys = Object.keys(localStorage)
+    keys.forEach(key => {
+      if (key.includes(`${currentUser?.id}-db-explorer-selected-tables-db-`) ||
+          key.includes(`${currentUser?.id}-db-explorer-expanded-tables-db-`)) {
+        localStorage.removeItem(key)
+      }
+    })
+
     setSelectedDatabase('')
     setSelectedTables([])
     setExpandedTables([])
-    setHasAttemptedConnection(false)
     setMermaidCode('')
     setMermaidSvg('')
     setMigrationPlan('')
@@ -1120,7 +1099,47 @@ export function DatabaseExplorerPage() {
         const data = await response.json()
 
         const summary = data.summary || {}
-        const results = data.results || []
+        const results = Array.isArray(data.results) ? data.results : []
+
+        // Record successful table migrations only
+        const successfulTables = results.filter((r: any) => r && r.status === 'SUCCESS') || []
+        if (successfulTables && successfulTables.length > 0) {
+          try {
+            successfulTables.forEach((r: any) => {
+              const tableName = r?.table_name || r?.table || 'Unknown'
+              const rowsMigrated = r?.rows_migrated || 0
+              const columnsCount = r?.columns_count || 
+                tables?.find?.((t: any) => t?.table_name === tableName)?.columns?.length || 0
+              
+              recordSuccessfulTableMigration(
+                tableName,
+                selectedDatabase,
+                selectedDatabase,
+                rowsMigrated,
+                columnsCount,
+              )
+            })
+            // Increment migration stats only when tables are successfully created
+            incrementMigrations(
+              successfulTables.length,
+              currentUser?.id,
+              currentUser?.username,
+              successfulTables.map((r: any) => ({
+                tableName: r?.table_name || r?.table || 'Unknown',
+                sourceDatabase: selectedDatabase,
+                targetDatabase: selectedDatabase,
+                rowsMigrated: r?.rows_migrated || 0,
+                columnsCount: r?.columns_count || 0,
+                timestamp: new Date().toISOString(),
+                status: 'success',
+              })) || [],
+            )
+            // Sync to file
+            await syncToFile()
+          } catch (recordError) {
+            logError(`Failed to record migration: ${recordError}`, 'error', 'Data Migration')
+          }
+        }
 
         if (
           summary.successful > 0 &&
@@ -1195,82 +1214,12 @@ export function DatabaseExplorerPage() {
         </Button>
       </div>
 
-      {/* Step 1 */}
-      <div className="rounded-lg border bg-card p-6 shadow-sm space-y-4">
-        <div>
-          <h2 className="text-lg font-semibold mb-2">
-            Step 1: Connection String
-          </h2>
-
-          <p className="text-sm text-muted-foreground mb-3">
-            Enter your PostgreSQL connection
-            string
-          </p>
-        </div>
-
-        <div className="space-y-3">
-          <Input
-            placeholder="postgresql://user:password@localhost:5432/postgres"
-            value={connectionString}
-            onChange={(e) => {
-              setConnectionString(
-                e.target.value,
-              )
-
-              setHasAttemptedConnection(false)
-              setSelectedDatabase('')
-              setSelectedTables([])
-              setExpandedTables([])
-              setMermaidCode('')
-              setMermaidSvg('')
-              setMigrationPlan('')
-              setMigrationPlanEditable('')
-
-              localStorage.removeItem(
-                getStorageKey('db-explorer-mermaid'),
-              )
-
-              localStorage.removeItem(
-                getStorageKey('db-explorer-migration-plan'),
-              )
-            }}
-            className="font-mono text-sm"
-          />
-
-          <div className="flex justify-end">
-            <Button
-              onClick={handleConnectClick}
-              disabled={
-                !connectionString.trim()
-              }
-              className="w-full sm:w-auto"
-            >
-              {databasesQuery.isLoading ? (
-                <>
-                  <Loader className="mr-2 h-4 w-4 animate-spin" />
-                  Connecting...
-                </>
-              ) : (
-                'Connect'
-              )}
-            </Button>
-          </div>
-
-          {databasesQuery.isError && (
-            <div className="rounded border border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950 p-3 text-sm text-red-800 dark:text-red-200">
-              <strong>Connection Error:</strong> {databasesQuery.error instanceof Error ? databasesQuery.error.message : 'Failed to connect to the database'}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Step 2 */}
-      {hasAttemptedConnection &&
-        !databasesQuery.isError && (
+      {/* Step 1 - Select Database */}
+      {!databasesQuery.isError && (
           <div className="rounded-lg border bg-card p-6 shadow-sm space-y-4">
             <div>
               <h2 className="text-lg font-semibold mb-2">
-                Step 2: Select Database
+                Step 1: Select Database
               </h2>
 
               <p className="text-sm text-muted-foreground mb-3">
@@ -1290,20 +1239,17 @@ export function DatabaseExplorerPage() {
                 value={selectedDatabase}
                 onValueChange={(value) => {
                   setSelectedDatabase(value)
-                  setSelectedTables([])
-                  setExpandedTables([])
-                  setColumnMappings([])
                   setMermaidCode('')
                   setMermaidSvg('')
                   setMigrationPlan('')
                   setMigrationPlanEditable('')
 
                   localStorage.removeItem(
-                    'db-explorer-mermaid',
+                    getStorageKey('db-explorer-mermaid'),
                   )
 
                   localStorage.removeItem(
-                    'db-explorer-migration-plan',
+                    getStorageKey('db-explorer-migration-plan'),
                   )
                 }}
               >
@@ -1332,15 +1278,15 @@ export function DatabaseExplorerPage() {
           </div>
         )}
 
-      {/* Step 3 */}
-      {/* Step 3 - Professional Table/Grid Layout */}
+      {/* Step 2 */}
+      {/* Step 2 - Professional Table/Grid Layout */}
 {selectedDatabase && (
   <div className="rounded-lg border bg-card p-6 shadow-sm space-y-4">
     {/* Header */}
     <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
       <div>
         <h2 className="text-lg font-semibold">
-          Step 3: Table Schemas
+          Step 2: Table Schemas
         </h2>
 
         <p className="text-sm text-muted-foreground">
@@ -1614,7 +1560,7 @@ export function DatabaseExplorerPage() {
   </div>
 )}
 
-      {/* Step 4 */}
+      {/* Step 3 */}
       {selectedDatabase &&
         schemasQuery.data &&
         schemasQuery.data.length >
@@ -1623,7 +1569,7 @@ export function DatabaseExplorerPage() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-lg font-semibold mb-2">
-                  Step 4: ER Diagram
+                  Step 3: ER Diagram
                 </h2>
 
                 <p className="text-sm text-muted-foreground mb-3">
@@ -1771,7 +1717,7 @@ export function DatabaseExplorerPage() {
           </div>
         )}
 
-      {/* Step 5 */}
+      {/* Step 4 */}
       {selectedDatabase &&
         schemasQuery.data &&
         schemasQuery.data.length >
@@ -1780,7 +1726,7 @@ export function DatabaseExplorerPage() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-lg font-semibold mb-2">
-                  Step 5: Migration Plan
+                  Step 4: Migration Plan
                 </h2>
 
                 <p className="text-sm text-muted-foreground mb-3">
@@ -1838,13 +1784,13 @@ export function DatabaseExplorerPage() {
           </div>
         )}
 
-      {/* Step 6 */}
+      {/* Step 5 */}
       {selectedTables.length > 0 && (
         <div className="rounded-lg border bg-card p-6 shadow-sm space-y-4">
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <h2 className="text-lg font-semibold mb-2">
-                Step 6: Column Mapping & Migration
+                Step 5: Column Mapping & Migration
               </h2>
 
               <p className="text-sm text-muted-foreground">
@@ -1853,7 +1799,7 @@ export function DatabaseExplorerPage() {
               </p>
             </div>
 
-            {columnMappings.length === 0 && (
+            {columnMappings.length === 0 ? (
               <Button
                 onClick={handleGetColumnMappings}
                 disabled={isLoadingMappings}
@@ -1867,6 +1813,50 @@ export function DatabaseExplorerPage() {
                   'Get Column Mappings'
                 )}
               </Button>
+            ) : (
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    columnMappings.forEach((table) => {
+                      table.columns.forEach((col: any) => {
+                        if (!table.selected_columns?.includes(col.source_column)) {
+                          handleSelectColumn(table.table_name, col.source_column, true)
+                        }
+                      })
+                    })
+                  }}
+                >
+                  Select All
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    columnMappings.forEach((table) => {
+                      table.selected_columns?.forEach((col: string) => {
+                        handleSelectColumn(table.table_name, col, false)
+                      })
+                    })
+                  }}
+                >
+                  Unselect All
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setExpandAllColumns((prev) => !prev)
+                  }
+                >
+                  {expandAllColumns
+                    ? 'Collapse All'
+                    : 'Expand All'}
+                </Button>
+              </div>
             )}
           </div>
 
@@ -1885,6 +1875,7 @@ export function DatabaseExplorerPage() {
               onMigrate={handleMigrateData}
               isMigrating={isMigrating}
               currentUser={currentUser}
+              expandAll={expandAllColumns}
             />
           )}
         </div>

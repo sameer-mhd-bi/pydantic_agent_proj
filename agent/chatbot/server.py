@@ -1022,6 +1022,57 @@ async def migrate_columns_endpoint(request: Request):
         )
 
 
+async def migration_history_endpoint(request: Request):
+    """Save migration history to file."""
+    try:
+        data = await request.json()
+        
+        # Save to migration-history.json
+        config_dir = ROOT_DIR / 'config'
+        config_dir.mkdir(exist_ok=True)
+        history_file = config_dir / 'migration-history.json'
+        
+        with open(history_file, 'w') as f:
+            json.dump(data, f, indent=2, default=str)
+        
+        return JSONResponse({'success': True, 'message': 'Migration history saved'})
+    
+    except Exception as e:
+        return JSONResponse(
+            {'detail': f'Failed to save migration history: {str(e)}'}, 
+            status_code=500
+        )
+
+
+async def get_migration_history_endpoint(request: Request):
+    """Fetch migration history from file."""
+    try:
+        from datetime import datetime
+        config_dir = ROOT_DIR / 'config'
+        history_file = config_dir / 'migration-history.json'
+        
+        if not history_file.exists():
+            return JSONResponse({
+                'version': '1.0',
+                'lastUpdated': datetime.utcnow().isoformat() + 'Z',
+                'totalMigrations': 0,
+                'schemasAnalyzed': 0,
+                'tableMigrations': [],
+                'records': [],
+            })
+        
+        with open(history_file, 'r') as f:
+            data = json.load(f)
+        
+        return JSONResponse(data)
+    
+    except Exception as e:
+        return JSONResponse(
+            {'detail': f'Failed to fetch migration history: {str(e)}'}, 
+            status_code=500
+        )
+
+
 class AgentDetailsMiddleware(BaseHTTPMiddleware):
     """Serve custom UI endpoints before delegating to the generated chat app."""
 
@@ -1064,6 +1115,10 @@ class AgentDetailsMiddleware(BaseHTTPMiddleware):
             return await column_mappings_endpoint(request)
         if request.url.path == '/api/migrate-columns' and request.method == 'POST':
             return await migrate_columns_endpoint(request)
+        if request.url.path == '/api/migration-history' and request.method == 'POST':
+            return await migration_history_endpoint(request)
+        if request.url.path == '/api/migration-history' and request.method == 'GET':
+            return await get_migration_history_endpoint(request)
         if request.url.path == '/api/agent-details-save' and request.method == 'POST':
             return await save_agent_details_endpoint(request)
         return await call_next(request)

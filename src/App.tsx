@@ -122,7 +122,7 @@ function AppContent() {
             ) : isAdminPage ? (
               <AdminPage />
             ) : isMigrationDashboard ? (
-              <MigrationDashboard />
+              <MigrationDashboard currentUser={currentUser} />
             ) : isErrorLogsPage ? (
               <ErrorLogsPage />
             ) : (

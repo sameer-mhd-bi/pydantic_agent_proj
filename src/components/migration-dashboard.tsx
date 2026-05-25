@@ -1,50 +1,94 @@
 import { useEffect, useState } from 'react'
-import { Activity, Database, TrendingUp, Calendar, User } from 'lucide-react'
+import { Activity, Database, TrendingUp, Calendar, User, Download } from 'lucide-react'
 import { Card } from '@/components/ui/card'
-import { getMigrationStats, getMigrationsByUser, type MigrationStats, type MigrationRecord } from '@/lib/migration-stats'
+import { Button } from '@/components/ui/button'
+import { downloadMigrationHistory, fetchMigrationHistory, type MigrationStats } from '@/lib/migration-stats'
 import type { User as UserType } from '@/types/user'
 
 export function MigrationDashboard({ currentUser }: { currentUser?: UserType | null }) {
-  const [stats, setStats] = useState<MigrationStats>(getMigrationStats())
-  const [userMigrations, setUserMigrations] = useState<MigrationRecord[]>([])
+  const [stats, setStats] = useState<MigrationStats>({
+    totalMigrations: 0,
+    schemasAnalyzed: 0,
+    lastUpdated: new Date().toISOString(),
+    records: [],
+  })
+  const [error, setError] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    const handleStatsUpdate = () => {
-      const newStats = getMigrationStats()
-      setStats(newStats)
-      if (currentUser?.id) {
-        setUserMigrations(getMigrationsByUser(currentUser.id))
-      } else {
-        setUserMigrations([])
+    const handleStatsUpdate = async () => {
+      try {
+        setError(null)
+        const newStats = await fetchMigrationHistory()
+        if (newStats) {
+          setStats(newStats)
+        }
+      } catch (err) {
+        console.error('Error fetching migration stats:', err)
+        setError('Unable to load migration history. Please try again later.')
+      } finally {
+        setIsLoading(false)
       }
     }
 
     handleStatsUpdate()
-    window.addEventListener('migration-stats-updated', handleStatsUpdate)
+    
+    // Poll every 3 seconds
+    const pollInterval = setInterval(handleStatsUpdate, 3000)
+    
     return () => {
-      window.removeEventListener('migration-stats-updated', handleStatsUpdate)
+      clearInterval(pollInterval)
     }
-  }, [currentUser?.id])
+  }, [])
 
-  const lastUpdatedDate = userMigrations.length > 0 
-    ? new Date(userMigrations[userMigrations.length - 1].timestamp).toLocaleDateString()
+  const lastUpdatedDate = stats.records.length > 0 
+    ? new Date(stats.records[stats.records.length - 1].timestamp).toLocaleDateString()
     : new Date(stats.lastUpdated).toLocaleDateString()
-  const lastUpdatedTime = userMigrations.length > 0 
-    ? new Date(userMigrations[userMigrations.length - 1].timestamp).toLocaleTimeString()
+  const lastUpdatedTime = stats.records.length > 0 
+    ? new Date(stats.records[stats.records.length - 1].timestamp).toLocaleTimeString()
     : new Date(stats.lastUpdated).toLocaleTimeString()
 
-  const userTotalMigrations = userMigrations.length
-  const userSchemasAnalyzed = userMigrations.reduce((sum, record) => sum + record.schemasCount, 0)
+  const userTotalMigrations = stats.records.filter(r => r.userId === currentUser?.id).length
+  const userSchemasAnalyzed = stats.records
+    .filter(r => r.userId === currentUser?.id)
+    .reduce((sum, record) => sum + record.schemasCount, 0)
 
   return (
     <div className="space-y-6 p-4">
-      <div>
-        <h1 className="text-3xl font-semibold tracking-tight">
-          Migration Dashboard
-        </h1>
-        <p className="text-muted-foreground mt-2">
-          Overview of your database migration progress
-        </p>
+      {isLoading && (
+        <div className="rounded-lg border bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-900 p-4">
+          <p className="text-sm text-blue-900 dark:text-blue-100">
+            Loading migration history...
+          </p>
+        </div>
+      )}
+      
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 dark:bg-red-900/20 p-4">
+          <p className="text-sm text-red-600 dark:text-red-400">
+            Error loading migration history: {error}
+          </p>
+        </div>
+      )}
+      
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight">
+            Migration Dashboard
+          </h1>
+          <p className="text-muted-foreground mt-2">
+            Overview of your database migration progress
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={downloadMigrationHistory}
+          className="gap-2"
+        >
+          <Download className="h-4 w-4" />
+          Download History
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -121,7 +165,7 @@ export function MigrationDashboard({ currentUser }: { currentUser?: UserType | n
       {/* Migration Records */}
       <div className="space-y-4">
         <h2 className="text-xl font-semibold">Migration History</h2>
-        {userMigrations.length === 0 ? (
+        {stats.records.length === 0 ? (
           <div className="rounded-lg border bg-muted/20 p-6 text-center">
             <p className="text-muted-foreground">No migrations yet. Start your first migration to see it here.</p>
           </div>
@@ -138,7 +182,7 @@ export function MigrationDashboard({ currentUser }: { currentUser?: UserType | n
                   </tr>
                 </thead>
                 <tbody>
-                  {userMigrations.map((record) => (
+                  {stats.records.map((record) => (
                     <tr key={record.id} className="border-b hover:bg-muted/30 transition-colors">
                       <td className="px-4 py-3 text-xs text-muted-foreground">
                         <div className="flex items-center gap-2">
