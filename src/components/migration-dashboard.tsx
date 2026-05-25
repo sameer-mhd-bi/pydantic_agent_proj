@@ -33,10 +33,14 @@ export function MigrationDashboard({ currentUser }: { currentUser?: UserType | n
 
     handleStatsUpdate()
     
+    // Listen to custom event for instant updates
+    window.addEventListener('migration-stats-updated', handleStatsUpdate)
+    
     // Poll every 3 seconds
     const pollInterval = setInterval(handleStatsUpdate, 3000)
     
     return () => {
+      window.removeEventListener('migration-stats-updated', handleStatsUpdate)
       clearInterval(pollInterval)
     }
   }, [])
@@ -48,10 +52,19 @@ export function MigrationDashboard({ currentUser }: { currentUser?: UserType | n
     ? new Date(stats.records[stats.records.length - 1].timestamp).toLocaleTimeString()
     : new Date(stats.lastUpdated).toLocaleTimeString()
 
-  const userTotalMigrations = stats.records.filter(r => r.userId === currentUser?.id).length
-  const userSchemasAnalyzed = stats.records
-    .filter(r => r.userId === currentUser?.id)
-    .reduce((sum, record) => sum + record.schemasCount, 0)
+  const isUserRecord = (record: any) => {
+    if (!currentUser) return false
+    return (
+      record.userId === currentUser.id ||
+      record.userId === currentUser.username ||
+      record.userName === currentUser.username ||
+      record.userName === currentUser.fullName ||
+      (currentUser.role === 'admin' && (record.userId === 'admin' || record.userId === 'admin-001' || record.userId === 'unknown' || !record.userId))
+    )
+  }
+
+  const globalTotalMigrations = stats.totalMigrations || stats.records.length
+  const globalSchemasAnalyzed = stats.schemasAnalyzed || stats.records.reduce((sum, r) => sum + r.schemasCount, 0)
 
   return (
     <div className="space-y-6 p-4">
@@ -104,7 +117,7 @@ export function MigrationDashboard({ currentUser }: { currentUser?: UserType | n
           </div>
           <div className="space-y-1">
             <p className="text-3xl font-bold">
-              {userTotalMigrations}
+              {globalTotalMigrations}
             </p>
             <p className="text-xs text-muted-foreground">
               Successful migration operations
@@ -124,7 +137,7 @@ export function MigrationDashboard({ currentUser }: { currentUser?: UserType | n
           </div>
           <div className="space-y-1">
             <p className="text-3xl font-bold">
-              {userSchemasAnalyzed}
+              {globalSchemasAnalyzed}
             </p>
             <p className="text-xs text-muted-foreground">
               Total schemas processed
@@ -147,7 +160,7 @@ export function MigrationDashboard({ currentUser }: { currentUser?: UserType | n
               {lastUpdatedDate}
             </p>
             <p className="text-xs text-muted-foreground">
-              {userTotalMigrations === 0
+              {globalTotalMigrations === 0
                 ? 'No migrations yet'
                 : `at ${lastUpdatedTime}`}
             </p>

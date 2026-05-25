@@ -1,6 +1,56 @@
 {
   "version": "1.0",
-  "lastUpdated": "2026-05-25T00:00:00Z",
-  "totalMigrations": 0,
-  "migrations": []
+  "lastUpdated": "2026-05-25T11:58:53.804Z",
+  "totalMigrations": 1,
+  "schemasAnalyzed": 2,
+  "records": [
+    {
+      "id": "migration-1779710333804",
+      "timestamp": "2026-05-25T11:58:53.804Z",
+      "userId": "admin-001",
+      "userName": "admin",
+      "schemasCount": 2,
+      "tablesCount": 2,
+      "tables": [
+        {
+          "tableName": "branch",
+          "sourceDatabase": "bank_db",
+          "targetDatabase": "bank_db",
+          "rowsMigrated": 0,
+          "columnsCount": 0,
+          "timestamp": "2026-05-25T11:58:53.804Z",
+          "status": "success"
+        },
+        {
+          "tableName": "accounts",
+          "sourceDatabase": "bank_db",
+          "targetDatabase": "bank_db",
+          "rowsMigrated": 0,
+          "columnsCount": 0,
+          "timestamp": "2026-05-25T11:58:53.804Z",
+          "status": "success"
+        }
+      ]
+    }
+  ],
+  "tableMigrations": [
+    {
+      "tableName": "branch",
+      "sourceDatabase": "bank_db",
+      "targetDatabase": "bank_db",
+      "rowsMigrated": 0,
+      "columnsCount": 4,
+      "timestamp": "2026-05-25T11:58:53.804Z",
+      "status": "success"
+    },
+    {
+      "tableName": "accounts",
+      "sourceDatabase": "bank_db",
+      "targetDatabase": "bank_db",
+      "rowsMigrated": 0,
+      "columnsCount": 6,
+      "timestamp": "2026-05-25T11:58:53.804Z",
+      "status": "success"
+    }
+  ]
 }

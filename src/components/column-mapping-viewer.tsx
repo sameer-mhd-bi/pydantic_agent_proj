@@ -3,7 +3,6 @@ import { Loader, CheckCircle, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
-import { incrementMigrations } from '@/lib/migration-stats'
 import type { User } from '@/types/user'
 
 interface ColumnMapping {
@@ -61,7 +60,6 @@ export function ColumnMappingViewer({
   onTargetColumnChange,
   onMigrate,
   isMigrating,
-  currentUser,
   expandAll,
 }: ColumnMappingViewerProps) {
   const [expandedTables, setExpandedTables] =
@@ -113,8 +111,9 @@ export function ColumnMappingViewer({
     setMigrationResults([])
     try {
       await onMigrate(tables)
-      const selectedTablesCount = tables.filter(t => t.selected_columns.length > 0).length
-      incrementMigrations(selectedTablesCount, currentUser?.id, currentUser?.fullName)
+      // Note: incrementMigrations is already called by the parent's onMigrate handler
+      // (handleMigrateData in database-explorer-page.tsx), so we don't call it here
+      // to avoid double-counting migrations.
     } catch (error) {
       console.error('Migration error:', error)
     }

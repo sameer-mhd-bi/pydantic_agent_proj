@@ -215,12 +215,39 @@ export async function fetchMigrationHistory(): Promise<MigrationStats | null> {
       return getDefaultStats()
     }
 
-    return {
-      totalMigrations: data.totalMigrations || 0,
+    const recordsList = Array.isArray(data.records)
+      ? data.records
+      : Array.isArray(data.migrations)
+      ? data.migrations
+      : []
+
+    const tableMigrations = Array.isArray(data.tableMigrations)
+      ? data.tableMigrations
+      : []
+
+    const stats = {
+      totalMigrations: data.totalMigrations || recordsList.length,
       schemasAnalyzed: data.schemasAnalyzed || 0,
       lastUpdated: data.lastUpdated || new Date().toISOString(),
-      records: Array.isArray(data.records) ? data.records : [],
+      records: recordsList,
     }
+
+    // Sync to local storage for overall consistency across views
+    try {
+      const prevStored = localStorage.getItem(STATS_KEY)
+      localStorage.setItem(STATS_KEY, JSON.stringify(stats))
+      localStorage.setItem(TABLES_MIGRATION_KEY, JSON.stringify(tableMigrations))
+      
+      // If the data changed from what was in localStorage, dispatch an update event
+      // so other components (like the dashboard) can react immediately
+      if (prevStored !== JSON.stringify(stats)) {
+        window.dispatchEvent(new CustomEvent('migration-stats-updated', { detail: stats }))
+      }
+    } catch (e) {
+      console.warn('Failed to sync server history to localStorage:', e)
+    }
+
+    return stats
   } catch (error) {
     console.error('Error fetching migration history:', error)
     return null

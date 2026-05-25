@@ -1005,6 +1005,83 @@ async def migrate_columns_endpoint(request: Request):
             if r.get('status') == 'FAILURE'
         )
 
+        # Record successful migrations to migration-history.json on the server
+        if successes > 0:
+            try:
+                from datetime import datetime
+                config_dir = ROOT_DIR.parent / 'config'
+                if not config_dir.exists():
+                    config_dir = ROOT_DIR / 'config'
+                config_dir.mkdir(exist_ok=True)
+                history_file = config_dir / 'migration-history.json'
+
+                # Load existing history
+                if history_file.exists():
+                    try:
+                        with open(history_file, 'r') as f:
+                            history_data = json.load(f)
+                    except Exception:
+                        history_data = {}
+                else:
+                    history_data = {}
+
+                # Initialize structure if empty
+                if not history_data:
+                    history_data = {
+                        'version': '1.0',
+                        'lastUpdated': datetime.utcnow().isoformat() + 'Z',
+                        'totalMigrations': 0,
+                        'schemasAnalyzed': 0,
+                        'tableMigrations': [],
+                        'records': [],
+                    }
+
+                if 'records' not in history_data:
+                    history_data['records'] = history_data.get('migrations', [])
+                if 'tableMigrations' not in history_data:
+                    history_data['tableMigrations'] = []
+
+                timestamp = datetime.utcnow().isoformat() + 'Z'
+                successful_tables = [r for r in migration_results if r.get('status') == 'SUCCESS']
+
+                table_details = []
+                for r in successful_tables:
+                    table_name = r.get('table', 'Unknown')
+                    detail = {
+                        'tableName': table_name,
+                        'sourceDatabase': payload.get('database', 'PostgreSQL'),
+                        'targetDatabase': 'Snowflake',
+                        'rowsMigrated': r.get('rows_migrated', 0),
+                        'columnsCount': r.get('columns', 0),
+                        'timestamp': timestamp,
+                        'status': 'success',
+                    }
+                    table_details.append(detail)
+                    history_data['tableMigrations'].append(detail)
+
+                record = {
+                    'id': f"migration-api-{int(datetime.utcnow().timestamp() * 1000)}",
+                    'timestamp': timestamp,
+                    'userId': 'user',
+                    'userName': 'User',
+                    'schemasCount': len(successful_tables),
+                    'tablesCount': len(successful_tables),
+                    'tables': table_details,
+                }
+
+                history_data['records'].append(record)
+                history_data['totalMigrations'] = len(history_data['records'])
+                history_data['schemasAnalyzed'] = history_data.get('schemasAnalyzed', 0) + len(successful_tables)
+                history_data['lastUpdated'] = timestamp
+                history_data['migrations'] = history_data['records']
+
+                with open(history_file, 'w') as f:
+                    json.dump(history_data, f, indent=2, default=str)
+
+                logger.info("Recorded %d successful migration(s) to migration-history.json", successes)
+            except Exception as e:
+                logger.error("Failed to record migration history: %s", e)
+
         return JSONResponse({
             'success': True,
             'summary': {
@@ -1028,7 +1105,10 @@ async def migration_history_endpoint(request: Request):
         data = await request.json()
         
         # Save to migration-history.json
-        config_dir = ROOT_DIR / 'config'
+        # Prioritize workspace root / config, fallback to ROOT_DIR / config
+        config_dir = ROOT_DIR.parent / 'config'
+        if not config_dir.exists():
+            config_dir = ROOT_DIR / 'config'
         config_dir.mkdir(exist_ok=True)
         history_file = config_dir / 'migration-history.json'
         
@@ -1048,9 +1128,14 @@ async def get_migration_history_endpoint(request: Request):
     """Fetch migration history from file."""
     try:
         from datetime import datetime
-        config_dir = ROOT_DIR / 'config'
+        # Prioritize workspace root / config, fallback to ROOT_DIR / config
+        config_dir = ROOT_DIR.parent / 'config'
         history_file = config_dir / 'migration-history.json'
         
+        if not history_file.exists():
+            config_dir = ROOT_DIR / 'config'
+            history_file = config_dir / 'migration-history.json'
+            
         if not history_file.exists():
             return JSONResponse({
                 'version': '1.0',
@@ -1063,6 +1148,18 @@ async def get_migration_history_endpoint(request: Request):
         
         with open(history_file, 'r') as f:
             data = json.load(f)
+            
+        # Normalize: ensure records and migrations keys are synced
+        if 'migrations' in data and 'records' not in data:
+            data['records'] = data['migrations']
+        elif 'records' in data and 'migrations' not in data:
+            data['migrations'] = data['records']
+            
+        if 'totalMigrations' not in data or data['totalMigrations'] == 0:
+            if 'records' in data and data['records']:
+                data['totalMigrations'] = len(data['records'])
+            elif 'migrations' in data and data['migrations']:
+                data['totalMigrations'] = len(data['migrations'])
         
         return JSONResponse(data)
     

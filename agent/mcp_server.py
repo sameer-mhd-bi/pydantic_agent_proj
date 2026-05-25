@@ -414,6 +414,115 @@ def map_pg_to_snowflake_type(pg_type: str) -> str:
     return mapping.get(pg_type, "TEXT")  # fallback
 
 
+def record_mcp_migration(source_table: str, target_table: str, rows_migrated: int, columns_count: int = 0):
+    """Record a successful tool-based migration to migration-history.json."""
+    import json
+    from datetime import datetime
+    
+    try:
+        # Resolve config/migration-history.json path
+        # Prioritize workspace root / config, fallback to ROOT_DIR / config
+        from chatbot.database_config import CONFIG_DIR
+        # Since database_config has CONFIG_DIR = Path(__file__).resolve().parent.parent / "config"
+        # which is agent/config, we can check its parent (workspace root) config dir
+        workspace_config_dir = CONFIG_DIR.parent.parent / 'config'
+        
+        # We will write to both files to keep them perfectly synced!
+        history_files = [
+            workspace_config_dir / 'migration-history.json',
+            CONFIG_DIR / 'migration-history.json'
+        ]
+        
+        for history_file in history_files:
+            try:
+                # Ensure config dir exists
+                history_file.parent.mkdir(parents=True, exist_ok=True)
+                
+                # Load existing data
+                if history_file.exists():
+                    try:
+                        with open(history_file, 'r') as f:
+                            data = json.load(f)
+                    except Exception:
+                        data = {}
+                else:
+                    data = {}
+                    
+                # Initialize default structure if empty
+                if not data:
+                    data = {
+                        'version': '1.0',
+                        'lastUpdated': datetime.utcnow().isoformat() + 'Z',
+                        'totalMigrations': 0,
+                        'schemasAnalyzed': 0,
+                        'tableMigrations': [],
+                        'records': []
+                    }
+                    
+                # Get active database names from pg_conn and conn if possible
+                source_db = "PostgreSQL"
+                target_db = "Snowflake"
+                try:
+                    if pg_conn is not None:
+                        source_db = pg_conn.get_dsn_parameters().get('dbname', 'PostgreSQL')
+                except Exception:
+                    pass
+                try:
+                    if conn is not None:
+                        target_db = conn.database or "Snowflake"
+                except Exception:
+                    pass
+                    
+                timestamp = datetime.utcnow().isoformat() + 'Z'
+                
+                # Create TableMigrationDetail
+                detail = {
+                    'tableName': source_table,
+                    'sourceDatabase': source_db,
+                    'targetDatabase': target_db,
+                    'rowsMigrated': rows_migrated,
+                    'columnsCount': columns_count,
+                    'timestamp': timestamp,
+                    'status': 'success'
+                }
+                
+                # Create MigrationRecord
+                record = {
+                    'id': f"migration-mcp-{int(datetime.utcnow().timestamp() * 1000)}",
+                    'timestamp': timestamp,
+                    'userId': 'agent',
+                    'userName': 'AI Agent',
+                    'schemasCount': 1,
+                    'tablesCount': 1,
+                    'tables': [detail]
+                }
+                
+                # Sync keys
+                if 'records' not in data:
+                    data['records'] = data.get('migrations', [])
+                if 'tableMigrations' not in data:
+                    data['tableMigrations'] = []
+                    
+                data['records'].append(record)
+                data['tableMigrations'].append(detail)
+                data['totalMigrations'] = len(data['records'])
+                data['schemasAnalyzed'] = data.get('schemasAnalyzed', 0) + 1
+                data['lastUpdated'] = timestamp
+                
+                # Ensure "migrations" key is also synced
+                data['migrations'] = data['records']
+                
+                with open(history_file, 'w') as f:
+                    json.dump(data, f, indent=2, default=str)
+                    
+                logger.info("Recorded successful MCP migration to %s", history_file)
+            except Exception as e:
+                logger.error("Failed to write migration history to %s: %s", history_file, e)
+                
+    except Exception as e:
+        logger.error("Failed to record successful MCP migration: %s", e)
+
+
 @app.tool()
 @log_tool_call
 def migrate_table_postgres_to_snowflake(
@@ -529,6 +638,17 @@ def migrate_table_postgres_to_snowflake(
         with conn.cursor() as cs:
             cs.execute(f"SELECT COUNT(*) FROM {target_table}")
             sf_count = cs.fetchone()[0]
+
+        # Record the migration history
+        try:
+            record_mcp_migration(
+                source_table=source_table,
+                target_table=target_table,
+                rows_migrated=sf_count,
+                columns_count=len(columns)
+            )
+        except Exception as e:
+            logger.warning("Failed to record MCP migration: %s", e)
 
         # ============================================================
         # SUCCESS
@@ -757,6 +877,17 @@ def migrate_query_postgres_to_snowflake(
         with conn.cursor() as cs:
             cs.execute(f"SELECT COUNT(*) FROM {target_table}")
             snowflake_count = cs.fetchone()[0]
+
+        # Record the migration history
+        try:
+            record_mcp_migration(
+                source_table=target_table,  # Use target_table as source name for queries
+                target_table=target_table,
+                rows_migrated=snowflake_count,
+                columns_count=len(columns)
+            )
+        except Exception as e:
+            logger.warning("Failed to record MCP migration: %s", e)
 
         # ============================================================
         # STEP 8 — RETURN SUCCESS RESPONSE
