@@ -36,4 +36,4 @@ cd agent
 Backend run --> uv run uvicorn chatbot.server:app --host 0.0.0.0 --port 38001 --env-file .env 
 cd ai-chat-ui-main
 
-Frontend run --- > pnpm run dev --host 0.0.0.0 # if not working run above cmd
+Frontend run --- > pnpm run dev --host 0.0.0.0 # if not working run above cmd 
