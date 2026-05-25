@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Activity, Database, TrendingUp, Calendar, User, Download } from 'lucide-react'
+import { Activity, Database, TrendingUp, Calendar, UserIcon, Download } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { downloadMigrationHistory, fetchMigrationHistory, type MigrationStats } from '@/lib/migration-stats'
-import type { User as UserType } from '@/types/user'
 
-export function MigrationDashboard({ currentUser }: { currentUser?: UserType | null }) {
+export function MigrationDashboard() {
   const [stats, setStats] = useState<MigrationStats>({
     totalMigrations: 0,
     schemasAnalyzed: 0,
@@ -52,16 +51,6 @@ export function MigrationDashboard({ currentUser }: { currentUser?: UserType | n
     ? new Date(stats.records[stats.records.length - 1].timestamp).toLocaleTimeString()
     : new Date(stats.lastUpdated).toLocaleTimeString()
 
-  const isUserRecord = (record: any) => {
-    if (!currentUser) return false
-    return (
-      record.userId === currentUser.id ||
-      record.userId === currentUser.username ||
-      record.userName === currentUser.username ||
-      record.userName === currentUser.fullName ||
-      (currentUser.role === 'admin' && (record.userId === 'admin' || record.userId === 'admin-001' || record.userId === 'unknown' || !record.userId))
-    )
-  }
 
   const globalTotalMigrations = stats.totalMigrations || stats.records.length
   const globalSchemasAnalyzed = stats.schemasAnalyzed || stats.records.reduce((sum, r) => sum + r.schemasCount, 0)
@@ -168,12 +157,7 @@ export function MigrationDashboard({ currentUser }: { currentUser?: UserType | n
         </Card>
       </div>
 
-      {/* Info Box */}
-      <div className="rounded-lg border bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-900 p-4">
-        <p className="text-sm text-blue-900 dark:text-blue-100">
-          💡 Start your first migration in the Database Profiler to see statistics update in real-time.
-        </p>
-      </div>
+
 
       {/* Migration Records */}
       <div className="space-y-4">
@@ -205,7 +189,7 @@ export function MigrationDashboard({ currentUser }: { currentUser?: UserType | n
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <User className="h-3 w-3" />
+                          <UserIcon className="h-3 w-3" />
                           <span className="font-medium">{record.userName}</span>
                         </div>
                       </td>

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import Chat from './Chat.tsx'
 import { AgentDetailsPage } from './components/agent-details-page.tsx'
 import { KnowledgeDetailsPage } from './components/knowledge-details-page.tsx'
@@ -26,7 +26,6 @@ function AppContent() {
   const [ready, setReady] = useState(false)
   const [route] = useConversationIdFromUrl()
   const { currentUser, logout } = useAuth()
-  const hasRedirectedRef = useRef(false)
 
   const isAgentDetailsPage = route === '/agent-details'
   const isKnowledgeDetailsPage = route === '/knowledge-details'
@@ -52,18 +51,17 @@ function AppContent() {
           setReady(true)
         })
     } else {
-      hasRedirectedRef.current = false
     }
   }, [currentUser])
 
   // Redirect to migration dashboard on first login only
   useEffect(() => {
-    if (ready && !hasRedirectedRef.current && (route === '/' || route === '')) {
-      hasRedirectedRef.current = true
-      window.history.pushState({}, '', '/migration-dashboard')
-      window.dispatchEvent(new Event('history-state-changed'))
-    }
-  }, [ready, route])
+   if (ready && !localStorage.getItem('app-initial-redirected')) {
+     localStorage.setItem('app-initial-redirected', 'true')
+     window.history.pushState({}, '', '/migration-dashboard')
+     window.dispatchEvent(new Event('history-state-changed'))
+   }
+  }, [ready])
 
   const handleLogout = () => {
     logout()
@@ -110,24 +108,23 @@ function AppContent() {
             isDetailsPage && 'max-w-6xl px-6 py-8 overflow-auto',
           )}
         >
-          {ready &&
-            (isAgentDetailsPage ? (
-              <AgentDetailsPage />
-            ) : isKnowledgeDetailsPage ? (
-              <KnowledgeDetailsPage />
-            ) : isDatabaseExplorerPage ? (
-              <DatabaseExplorerPage />
-            ) : isDatabaseConfigPage ? (
-              <DatabaseConfigPage />
-            ) : isAdminPage ? (
-              <AdminPage />
-            ) : isMigrationDashboard ? (
-              <MigrationDashboard currentUser={currentUser} />
-            ) : isErrorLogsPage ? (
-              <ErrorLogsPage />
-            ) : (
-              <Chat />
-            ))}
+         {isAgentDetailsPage ? (
+           <AgentDetailsPage />
+         ) : isKnowledgeDetailsPage ? (
+           <KnowledgeDetailsPage />
+         ) : isDatabaseExplorerPage ? (
+           <DatabaseExplorerPage />
+         ) : isDatabaseConfigPage ? (
+           <DatabaseConfigPage />
+         ) : isAdminPage ? (
+           <AdminPage />
+         ) : isMigrationDashboard ? (
+           <MigrationDashboard />
+         ) : isErrorLogsPage ? (
+           <ErrorLogsPage />
+         ) : (
+           <Chat />
+         )}
         </div>
       </div>
     </SidebarProvider>

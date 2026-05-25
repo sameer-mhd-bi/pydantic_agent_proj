@@ -1,8 +1,8 @@
 {
   "version": "1.0",
-  "lastUpdated": "2026-05-25T11:58:53.804Z",
-  "totalMigrations": 1,
-  "schemasAnalyzed": 2,
+  "lastUpdated": "2026-05-25T16:33:00.303Z",
+  "totalMigrations": 5,
+  "schemasAnalyzed": 6,
   "records": [
     {
       "id": "migration-1779710333804",
@@ -31,6 +31,82 @@
           "status": "success"
         }
       ]
+    },
+    {
+      "id": "migration-1779723681764",
+      "timestamp": "2026-05-25T15:41:21.764Z",
+      "userId": "admin-001",
+      "userName": "admin",
+      "schemasCount": 1,
+      "tablesCount": 1,
+      "tables": [
+        {
+          "tableName": "customers",
+          "sourceDatabase": "migration_db",
+          "targetDatabase": "migration_db",
+          "rowsMigrated": 0,
+          "columnsCount": 0,
+          "timestamp": "2026-05-25T15:41:21.764Z",
+          "status": "success"
+        }
+      ]
+    },
+    {
+      "id": "migration-1779725648268",
+      "timestamp": "2026-05-25T16:14:08.268Z",
+      "userId": "admin-001",
+      "userName": "admin",
+      "schemasCount": 1,
+      "tablesCount": 1,
+      "tables": [
+        {
+          "tableName": "transactions",
+          "sourceDatabase": "migration_db",
+          "targetDatabase": "migration_db",
+          "rowsMigrated": 0,
+          "columnsCount": 0,
+          "timestamp": "2026-05-25T16:14:08.267Z",
+          "status": "success"
+        }
+      ]
+    },
+    {
+      "id": "migration-1779726105784",
+      "timestamp": "2026-05-25T16:21:45.784Z",
+      "userId": "admin-001",
+      "userName": "admin",
+      "schemasCount": 1,
+      "tablesCount": 1,
+      "tables": [
+        {
+          "tableName": "customers",
+          "sourceDatabase": "migration_db",
+          "targetDatabase": "migration_db",
+          "rowsMigrated": 0,
+          "columnsCount": 0,
+          "timestamp": "2026-05-25T16:21:45.784Z",
+          "status": "success"
+        }
+      ]
+    },
+    {
+      "id": "migration-1779726780303",
+      "timestamp": "2026-05-25T16:33:00.303Z",
+      "userId": "admin-001",
+      "userName": "admin",
+      "schemasCount": 1,
+      "tablesCount": 1,
+      "tables": [
+        {
+          "tableName": "customers",
+          "sourceDatabase": "migration_db",
+          "targetDatabase": "migration_db",
+          "rowsMigrated": 0,
+          "columnsCount": 0,
+          "timestamp": "2026-05-25T16:33:00.303Z",
+          "status": "success"
+        }
+      ]
     }
   ],
   "tableMigrations": [
@@ -50,6 +126,42 @@
       "rowsMigrated": 0,
       "columnsCount": 6,
       "timestamp": "2026-05-25T11:58:53.804Z",
+      "status": "success"
+    },
+    {
+      "tableName": "customers",
+      "sourceDatabase": "migration_db",
+      "targetDatabase": "migration_db",
+      "rowsMigrated": 0,
+      "columnsCount": 6,
+      "timestamp": "2026-05-25T15:41:21.763Z",
+      "status": "success"
+    },
+    {
+      "tableName": "transactions",
+      "sourceDatabase": "migration_db",
+      "targetDatabase": "migration_db",
+      "rowsMigrated": 0,
+      "columnsCount": 6,
+      "timestamp": "2026-05-25T16:14:08.267Z",
+      "status": "success"
+    },
+    {
+      "tableName": "customers",
+      "sourceDatabase": "migration_db",
+      "targetDatabase": "migration_db",
+      "rowsMigrated": 0,
+      "columnsCount": 6,
+      "timestamp": "2026-05-25T16:21:45.784Z",
+      "status": "success"
+    },
+    {
+      "tableName": "customers",
+      "sourceDatabase": "migration_db",
+      "targetDatabase": "migration_db",
+      "rowsMigrated": 0,
+      "columnsCount": 6,
+      "timestamp": "2026-05-25T16:33:00.303Z",
       "status": "success"
     }
   ]

@@ -9,8 +9,8 @@ export type ConversationProps = ComponentProps<typeof StickToBottom>
 
 export const Conversation = ({ className, ...props }: ConversationProps) => (
   <StickToBottom
-    className={cn('relative flex-1 custom-scrollbar overflow-hidden', className)}
-    initial="smooth"
+   className={cn('relative flex flex-col flex-1 custom-scrollbar overflow-y-auto', className)}
+   initial="instant"
     resize="smooth"
     role="log"
     {...props}
@@ -20,7 +20,7 @@ export const Conversation = ({ className, ...props }: ConversationProps) => (
 export type ConversationContentProps = ComponentProps<typeof StickToBottom.Content>
 
 export const ConversationContent = ({ className, ...props }: ConversationContentProps) => (
-  <StickToBottom.Content className={cn('p-4 stick-to-bottom', className)} {...props} />
+  <StickToBottom.Content className={cn('p-4 flex flex-col', className)} {...props} />
 )
 
 export type ConversationScrollButtonProps = ComponentProps<typeof Button>
