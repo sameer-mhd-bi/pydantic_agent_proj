@@ -121,7 +121,7 @@ export function ErrorLogsPage() {
                 {errors.map((error) => (
                   <tr key={error.id} className={`border-b ${getStatusBg(error.status)}`}>
                     <td className="px-6 py-4 text-sm whitespace-nowrap">{error.timestamp}</td>
-                    <td className="px-6 py-4 text-sm max-w-md truncate">{error.error}</td>
+                    <td className="px-6 py-4 text-sm max-w-lg break-words whitespace-normal">{error.error}</td>
                     <td className="px-6 py-4 text-sm">
                       <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getSeverityColor(error.severity)}`}>
                         {error.severity.toUpperCase()}

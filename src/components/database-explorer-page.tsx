@@ -330,6 +330,9 @@ export function DatabaseExplorerPage() {
   const [isStateRestored, setIsStateRestored] =
     useState(false)
 
+  const [hasAutoSelectedTables, setHasAutoSelectedTables] =
+    useState(false)
+
   const [isMigrating, setIsMigrating] =
     useState(false)
 
@@ -337,7 +340,10 @@ export function DatabaseExplorerPage() {
     useRef<HTMLDivElement | null>(null)
 
   // Load persisted state
+  // Load persisted state
   useEffect(() => {
+    if (!currentUser?.id) return
+    
     const savedConnectionString =
       localStorage.getItem(
         getStorageKey('db-explorer-connection'),
@@ -374,6 +380,11 @@ export function DatabaseExplorerPage() {
     const savedColumnMappings =
       localStorage.getItem(
         getStorageKey('db-explorer-column-mappings'),
+      )
+
+    const savedHasAutoSelected =
+      localStorage.getItem(
+        getStorageKey('db-explorer-has-auto-selected'),
       )
 
     if (savedConnectionString) {
@@ -423,68 +434,88 @@ export function DatabaseExplorerPage() {
       }
     }
 
+    if (savedHasAutoSelected === 'true') {
+      setHasAutoSelectedTables(true)
+    }
+
     setIsStateRestored(true)
-  }, [])
+  }, [currentUser?.id])
 
   useEffect(() => {
+    if (!currentUser?.id) return
     localStorage.setItem(
       getStorageKey('db-explorer-connection'),
       connectionString,
     )
-  }, [connectionString])
+  }, [connectionString, currentUser?.id])
 
   useEffect(() => {
+    if (!currentUser?.id) return
     localStorage.setItem(
       getStorageKey('db-explorer-database'),
       selectedDatabase,
     )
-  }, [selectedDatabase])
+  }, [selectedDatabase, currentUser?.id])
 
   useEffect(() => {
+    if (!currentUser?.id) return
     localStorage.setItem(
       getStorageKey('db-explorer-attempted'),
       String(hasAttemptedConnection),
     )
-  }, [hasAttemptedConnection])
+  }, [hasAttemptedConnection, currentUser?.id])
 
   useEffect(() => {
+    if (!currentUser?.id) return
     if (mermaidCode) {
       localStorage.setItem(
         getStorageKey('db-explorer-mermaid'),
         mermaidCode,
       )
     }
-  }, [mermaidCode])
+  }, [mermaidCode, currentUser?.id])
 
   useEffect(() => {
+    if (!currentUser?.id) return
     if (migrationPlan) {
       localStorage.setItem(
         getStorageKey('db-explorer-migration-plan'),
         migrationPlan,
       )
     }
-  }, [migrationPlan])
+  }, [migrationPlan, currentUser?.id])
 
   useEffect(() => {
+    if (!currentUser?.id) return
     localStorage.setItem(
       getStorageKey('db-explorer-selected-tables'),
       JSON.stringify(selectedTables),
     )
-  }, [selectedTables])
+  }, [selectedTables, currentUser?.id])
 
   useEffect(() => {
+    if (!currentUser?.id) return
     localStorage.setItem(
       getStorageKey('db-explorer-expanded-tables'),
       JSON.stringify(expandedTables),
     )
-  }, [expandedTables])
+  }, [expandedTables, currentUser?.id])
 
   useEffect(() => {
+    if (!currentUser?.id) return
     localStorage.setItem(
       getStorageKey('db-explorer-column-mappings'),
       JSON.stringify(columnMappings),
     )
-  }, [columnMappings])
+  }, [columnMappings, currentUser?.id])
+
+  useEffect(() => {
+    if (!currentUser?.id) return
+    localStorage.setItem(
+      getStorageKey('db-explorer-has-auto-selected'),
+      String(hasAutoSelectedTables),
+    )
+  }, [hasAutoSelectedTables, currentUser?.id])
 
   useEffect(() => {
     mermaid.initialize({
@@ -597,20 +628,33 @@ export function DatabaseExplorerPage() {
     retry: 1,
   })
 
-  // Auto select all tables
+  // Auto select all tables only on first load
+  // Auto select all tables only on first load when no saved selection exists
   useEffect(() => {
     if (
       schemasQuery.data &&
       isStateRestored &&
-      selectedTables.length === 0
+      !hasAutoSelectedTables &&
+      selectedDatabase
     ) {
-      setSelectedTables(
-        schemasQuery.data.map(
-          (table) => table.table_name,
-        ),
+      // Check if there's saved selection in localStorage
+      const savedSelectedTables = localStorage.getItem(
+        getStorageKey('db-explorer-selected-tables'),
       )
+      
+      // Only auto-select if no saved selection exists AND we haven't auto-selected before
+      if (!savedSelectedTables || savedSelectedTables === '[]') {
+        setSelectedTables(
+          schemasQuery.data.map(
+            (table) => table.table_name,
+          ),
+        )
+      }
+      
+      // Mark that we've attempted auto-selection for this session
+      setHasAutoSelectedTables(true)
     }
-  }, [schemasQuery.data, isStateRestored])
+  }, [schemasQuery.data, isStateRestored, selectedDatabase, hasAutoSelectedTables])
 
   // Sync selected tables to agent schema memory
   useEffect(() => {
@@ -797,6 +841,7 @@ export function DatabaseExplorerPage() {
     setMermaidSvg('')
     setMigrationPlan('')
     setMigrationPlanEditable('')
+    setHasAutoSelectedTables(false)
 
     localStorage.removeItem(
       getStorageKey('db-explorer-mermaid'),
@@ -804,6 +849,10 @@ export function DatabaseExplorerPage() {
 
     localStorage.removeItem(
       getStorageKey('db-explorer-migration-plan'),
+    )
+
+    localStorage.removeItem(
+      getStorageKey('db-explorer-has-auto-selected'),
     )
   }
 
@@ -828,6 +877,10 @@ export function DatabaseExplorerPage() {
       getStorageKey('db-explorer-migration-plan'),
     )
 
+    localStorage.removeItem(
+      getStorageKey('db-explorer-has-auto-selected'),
+    )
+
     setConnectionString('')
     setSelectedDatabase('')
     setSelectedTables([])
@@ -837,6 +890,7 @@ export function DatabaseExplorerPage() {
     setMermaidSvg('')
     setMigrationPlan('')
     setMigrationPlanEditable('')
+    setHasAutoSelectedTables(false)
 
     toast.success('Explorer history cleared')
   }
