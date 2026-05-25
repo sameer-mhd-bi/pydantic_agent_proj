@@ -20,6 +20,7 @@ import {
 import { useAuth } from './user-provider'
 import { MigrationPlanViewer } from '@/components/migration-plan-viewer'
 import { ColumnMappingViewer } from '@/components/column-mapping-viewer'
+import { logError } from '@/lib/error-logger'
 
 interface DatabaseInfo {
   name: string
@@ -326,6 +327,9 @@ export function DatabaseExplorerPage() {
   const [isLoadingMappings, setIsLoadingMappings] =
     useState(false)
 
+  const [isStateRestored, setIsStateRestored] =
+    useState(false)
+
   const [isMigrating, setIsMigrating] =
     useState(false)
 
@@ -357,6 +361,21 @@ export function DatabaseExplorerPage() {
         getStorageKey('db-explorer-migration-plan'),
       )
 
+    const savedSelectedTables =
+      localStorage.getItem(
+        getStorageKey('db-explorer-selected-tables'),
+      )
+
+    const savedExpandedTables =
+      localStorage.getItem(
+        getStorageKey('db-explorer-expanded-tables'),
+      )
+
+    const savedColumnMappings =
+      localStorage.getItem(
+        getStorageKey('db-explorer-column-mappings'),
+      )
+
     if (savedConnectionString) {
       setConnectionString(savedConnectionString)
     }
@@ -379,6 +398,32 @@ export function DatabaseExplorerPage() {
         savedMigrationPlan,
       )
     }
+
+    if (savedSelectedTables) {
+      try {
+        setSelectedTables(JSON.parse(savedSelectedTables))
+      } catch {
+        setSelectedTables([])
+      }
+    }
+
+    if (savedExpandedTables) {
+      try {
+        setExpandedTables(JSON.parse(savedExpandedTables))
+      } catch {
+        setExpandedTables([])
+      }
+    }
+
+    if (savedColumnMappings) {
+      try {
+        setColumnMappings(JSON.parse(savedColumnMappings))
+      } catch {
+        setColumnMappings([])
+      }
+    }
+
+    setIsStateRestored(true)
   }, [])
 
   useEffect(() => {
@@ -419,6 +464,27 @@ export function DatabaseExplorerPage() {
       )
     }
   }, [migrationPlan])
+
+  useEffect(() => {
+    localStorage.setItem(
+      getStorageKey('db-explorer-selected-tables'),
+      JSON.stringify(selectedTables),
+    )
+  }, [selectedTables])
+
+  useEffect(() => {
+    localStorage.setItem(
+      getStorageKey('db-explorer-expanded-tables'),
+      JSON.stringify(expandedTables),
+    )
+  }, [expandedTables])
+
+  useEffect(() => {
+    localStorage.setItem(
+      getStorageKey('db-explorer-column-mappings'),
+      JSON.stringify(columnMappings),
+    )
+  }, [columnMappings])
 
   useEffect(() => {
     mermaid.initialize({
@@ -476,6 +542,7 @@ export function DatabaseExplorerPage() {
 
         if (isMounted) {
           setMermaidSvg('')
+          logError('Failed to render ER diagram', 'error', 'DatabaseExplorer')
           toast.error(
             'Failed to render ER diagram',
           )
@@ -503,6 +570,13 @@ export function DatabaseExplorerPage() {
     retry: 1,
   })
 
+  useEffect(() => {
+    if (databasesQuery.isError) {
+      const errorMsg = databasesQuery.error instanceof Error ? databasesQuery.error.message : 'Failed to connect to the database'
+      logError(errorMsg, 'error', 'Database Connection')
+    }
+  }, [databasesQuery.isError, databasesQuery.error])
+
   const schemasQuery = useQuery({
     queryKey: [
       'table-schemas',
@@ -525,14 +599,18 @@ export function DatabaseExplorerPage() {
 
   // Auto select all tables
   useEffect(() => {
-    if (schemasQuery.data) {
+    if (
+      schemasQuery.data &&
+      isStateRestored &&
+      selectedTables.length === 0
+    ) {
       setSelectedTables(
         schemasQuery.data.map(
           (table) => table.table_name,
         ),
       )
     }
-  }, [schemasQuery.data])
+  }, [schemasQuery.data, isStateRestored])
 
   // Sync selected tables to agent schema memory
   useEffect(() => {
@@ -646,6 +724,7 @@ export function DatabaseExplorerPage() {
           ? error.message
           : 'Failed to generate ER diagram'
 
+      logError(errorMsg, 'error', 'ER Diagram Generation')
       toast.error(errorMsg)
     },
   })
@@ -696,6 +775,7 @@ export function DatabaseExplorerPage() {
           ? error.message
           : 'Failed to generate migration plan'
 
+      logError(errorMsg, 'error', 'Migration Plan')
       toast.error(errorMsg)
     },
   })
@@ -804,6 +884,7 @@ export function DatabaseExplorerPage() {
           ? error.message
           : 'Failed to save migration plan'
 
+      logError(errorMsg, 'error', 'Save Migration Plan')
       toast.error(errorMsg)
     } finally {
       setIsSavingMigrationPlan(false)
@@ -868,6 +949,7 @@ export function DatabaseExplorerPage() {
           error instanceof Error
             ? error.message
             : 'Failed to get column mappings'
+        logError(errorMsg, 'error', 'Column Mappings')
         toast.error(errorMsg)
       } finally {
         setIsLoadingMappings(false)
@@ -997,6 +1079,15 @@ export function DatabaseExplorerPage() {
           summary.successful > 0 &&
           summary.failed > 0
         ) {
+          const failedErrors = results
+            .filter((r: any) => r.status === 'FAILURE')
+            .map((r: any) => r.error)
+            .join('; ')
+          logError(
+            `Migration partial: ${summary.successful} succeeded, ${summary.failed} failed. ${failedErrors}`,
+            'error',
+            'Data Migration',
+          )
           toast.warning(
             `Migration partial: ${summary.successful} succeeded, ${summary.failed} failed`,
           )
@@ -1005,6 +1096,11 @@ export function DatabaseExplorerPage() {
             .filter((r: any) => r.status === 'FAILURE')
             .map((r: any) => r.error)
             .join('; ')
+          logError(
+            `Migration failed: ${failedErrors}`,
+            'error',
+            'Data Migration',
+          )
           toast.error(
             `Migration failed: ${failedErrors}`,
           )
@@ -1014,6 +1110,7 @@ export function DatabaseExplorerPage() {
           error instanceof Error
             ? error.message
             : 'Migration failed'
+        logError(errorMsg, 'error', 'Data Migration')
         toast.error(errorMsg)
       } finally {
         setIsMigrating(false)

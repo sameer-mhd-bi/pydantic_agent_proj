@@ -73,7 +73,7 @@
   --chart-5: oklch(0.769 0.188 70.08);
   --sugar: oklch(0.991 0.006 115.7);
   --sidebar: var(--sugar);
-  --sidebar-foreground: oklch(0.141 0.005 285.823);
+  --sidebar-foreground: #bbc2be;
   --sidebar-primary: oklch(0.707 0.149 164.4);
   --sidebar-primary-foreground: oklch(0.969 0.015 12.422);
   --sidebar-accent: #8347ad;
@@ -126,7 +126,7 @@
 
   body {
     @apply bg-background text-foreground;
-    font-size: 0.9rem;
+    font-size: 0.999rem;
   }
 }
 

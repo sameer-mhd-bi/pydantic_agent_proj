@@ -7,6 +7,7 @@ import { DatabaseConfigPage } from './components/database-config-page.tsx'
 import { AdminPage } from './components/admin-page.tsx'
 import { LoginPage } from './components/login-page.tsx'
 import { MigrationDashboard } from './components/migration-dashboard.tsx'
+import { ErrorLogsPage } from './components/error-logs-page.tsx'
 import { AppSidebar } from './components/app-sidebar.tsx'
 import { ThemeProvider } from './components/theme-provider.tsx'
 import { UserProvider, useAuth } from './components/user-provider.tsx'
@@ -33,7 +34,8 @@ function AppContent() {
   const isDatabaseConfigPage = route === '/database-config'
   const isAdminPage = route === '/admin'
   const isMigrationDashboard = route === '/migration-dashboard'
-  const isDetailsPage = isAgentDetailsPage || isKnowledgeDetailsPage || isDatabaseExplorerPage || isDatabaseConfigPage || isAdminPage || isMigrationDashboard
+  const isErrorLogsPage = route === '/error-logs'
+  const isDetailsPage = isAgentDetailsPage || isKnowledgeDetailsPage || isDatabaseExplorerPage || isDatabaseConfigPage || isAdminPage || isMigrationDashboard || isErrorLogsPage
 
   useEffect(() => {
     if (currentUser) {
@@ -121,6 +123,8 @@ function AppContent() {
               <AdminPage />
             ) : isMigrationDashboard ? (
               <MigrationDashboard />
+            ) : isErrorLogsPage ? (
+              <ErrorLogsPage />
             ) : (
               <Chat />
             ))}

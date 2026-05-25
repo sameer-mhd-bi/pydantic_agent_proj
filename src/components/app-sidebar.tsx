@@ -1,7 +1,8 @@
-import { BookOpen, CirclePlus, Database, FileText, LogOut, MessageCircle, Settings, Trash, UserCog, TrendingUp } from 'lucide-react'
+import { BookOpen, CirclePlus, Database, FileText, LogOut, MessageCircle, Settings, Trash, UserCog, TrendingUp, AlertCircle } from 'lucide-react'
 import type React from 'react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
+import { getErrors } from '@/lib/error-logger'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -85,6 +86,7 @@ function deleteConversation(conversationId: string) {
 export function AppSidebar({ onLogout, currentUser }: { onLogout: () => void; currentUser: User }) {
   const conversations = useConversations(currentUser.id)
   const [route] = useConversationIdFromUrl()
+  const [errorCount, setErrorCount] = useState(0)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [conversationToDelete, setConversationToDelete] = useState<ConversationEntry | null>(null)
 
@@ -92,6 +94,19 @@ export function AppSidebar({ onLogout, currentUser }: { onLogout: () => void; cu
     if (path === '/' && (route === '/' || route === '')) return true
     return route === path
   }
+
+  useEffect(() => {
+    const refreshErrors = () => {
+      setErrorCount(getErrors().filter((error) => error.status !== 'resolved').length)
+    }
+
+    refreshErrors()
+    window.addEventListener('error-logged', refreshErrors)
+
+    return () => {
+      window.removeEventListener('error-logged', refreshErrors)
+    }
+  }, [])
 
   const handleDeleteClick = (e: React.MouseEvent, conversation: ConversationEntry) => {
     e.preventDefault()
@@ -123,7 +138,7 @@ export function AppSidebar({ onLogout, currentUser }: { onLogout: () => void; cu
             <SidebarTrigger className="ml-0" />
           </div>
           <div className="ml-2 flex items-center">
-            <h1 className="text-l font-medium text-balance truncate whitespace-nowrap">
+            <h1 className="text-xl font-medium text-balance truncate whitespace-nowrap">
               <span className="group-data-[state=collapsed]:invisible">Migration Assistant</span>
             </h1>
           </div>
@@ -185,26 +200,6 @@ export function AppSidebar({ onLogout, currentUser }: { onLogout: () => void; cu
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               )}
-              {currentUser.role === 'admin' && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Configure databases" className={cn('hover:bg-black hover:text-white', isActive('/database-config') && 'bg-black text-white')}>
-                    <a href={withBasePath('/database-config')} onClick={doLocalNavigation}>
-                      <Settings />
-                      <span>Database Config</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
-              {currentUser.role === 'admin' && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Manage users" className={cn('hover:bg-black hover:text-white', isActive('/admin') && 'bg-black text-white')}>
-                    <a href={withBasePath('/admin')} onClick={doLocalNavigation}>
-                      <UserCog />
-                      <span>Admin Panel</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="View migration statistics" className={cn('hover:bg-black hover:text-white', isActive('/migration-dashboard') && 'bg-black text-white')}>
                   <a href={withBasePath('/migration-dashboard')} onClick={doLocalNavigation}>
@@ -214,6 +209,50 @@ export function AppSidebar({ onLogout, currentUser }: { onLogout: () => void; cu
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
+            
+            {currentUser.role === 'admin' && (
+              <>
+                <div className="px-2 pt-3 group-data-[state=collapsed]:hidden">
+                  <SidebarSeparator className="mx-0" />
+                  <p className="pt-3 text-xs font-semibold uppercase tracking-[0.12em]" style={{ color: '#DFDFDF' }}>
+                    Administration
+                  </p>
+                </div>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild tooltip="Manage users" className={cn('hover:bg-black hover:text-white', isActive('/admin') && 'bg-black text-white')}>
+                        <a href={withBasePath('/admin')} onClick={doLocalNavigation}>
+                          <UserCog />
+                          <span>Admin Panel</span>
+                        </a>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild tooltip="Configure databases" className={cn('hover:bg-black hover:text-white', isActive('/database-config') && 'bg-black text-white')}>
+                        <a href={withBasePath('/database-config')} onClick={doLocalNavigation}>
+                          <Settings />
+                          <span>Database Config</span>
+                        </a>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild tooltip="View error logs" className={cn('hover:bg-black hover:text-white', isActive('/error-logs') && 'bg-black text-white')}>
+                        <a href={withBasePath('/error-logs')} onClick={doLocalNavigation} className="flex items-center gap-2">
+                          <AlertCircle />
+                          <span>Error Logs</span>
+                          {errorCount > 0 && (
+                            <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-red-600 px-2 text-[0.65rem] font-semibold text-white">
+                              {errorCount}
+                            </span>
+                          )}
+                        </a>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </>
+            )}
 
             <div className="px-2 pt-3 group-data-[state=collapsed]:hidden">
               <SidebarSeparator className="mx-0" />
