@@ -682,6 +682,36 @@ def _migrate_table_postgres_to_snowflake_sync(
             logger.warning("Could not determine source table size: %s", e)
 
         # ============================================================
+        # STEP 0.5 — CHECK IF TARGET TABLE ALREADY EXISTS IN SNOWFLAKE
+        # ============================================================
+        
+        try:
+            check_table_sql = f"""
+            SELECT COUNT(*) FROM information_schema.tables 
+            WHERE table_name = '{target_table.upper()}' 
+            AND table_schema = 'STAGING'
+            """
+            sf_cursor.execute(check_table_sql)
+            result = sf_cursor.fetchone()
+            table_exists = result[0] > 0 if result else False
+            
+            if table_exists:
+                warning_msg = f"Target table '{target_table}' already exists in Snowflake. Migration skipped."
+                logger.warning(warning_msg)
+                return json.dumps({
+                    "status": "SKIPPED",
+                    "reason": "Table already present",
+                    "message": warning_msg,
+                    "source_table": source_table,
+                    "target_table": target_table,
+                    "action": "No migration performed"
+                }, indent=2)
+            else:
+                logger.info("Target table '%s' does not exist in Snowflake. Proceeding with migration.", target_table)
+        except Exception as e:
+            logger.warning("Could not check if target table exists: %s. Proceeding with migration attempt.", e)
+
+        # ============================================================
         # STEP 1 — EXTRACT SCHEMA FROM POSTGRES
         # ============================================================
 
