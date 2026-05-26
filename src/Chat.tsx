@@ -21,7 +21,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Switch } from '@/components/ui/switch'
 import { useChat } from '@ai-sdk/react'
 import { Settings2Icon } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, Component, type SyntheticEvent, type ReactNode } from 'react'
 
 import { useQuery } from '@tanstack/react-query'
 import { useThrottle } from '@uidotdev/usehooks'
@@ -33,6 +33,48 @@ import type { ConversationEntry } from './types'
 import { getToolIcon } from '@/lib/tool-icons'
 import { getMessages, saveMessages, saveConversation } from '@/lib/chat-db'
 import { stripBasePath, withBasePath } from '@/lib/base-path'
+
+interface ErrorBoundaryProps {
+  children: ReactNode
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean
+  error: Error | null
+}
+
+class ChatErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props)
+    this.state = { hasError: false, error: null }
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error }
+  }
+
+  componentDidCatch(error: Error, info: { componentStack: string }) {
+    console.error('ChatErrorBoundary caught a render error:', error, info)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
+          <p className="text-destructive font-semibold text-lg">Something went wrong while rendering the chat.</p>
+          <p className="text-muted-foreground text-sm">{this.state.error?.message}</p>
+          <button
+            className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90"
+            onClick={() => this.setState({ hasError: false, error: null })}
+          >
+            Try again
+          </button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 interface ModelConfig {
   id: string
@@ -66,6 +108,8 @@ const Chat = () => {
   const { currentUser } = useAuth()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
+  const [messagesLoaded, setMessagesLoaded] = useState(() => conversationId === '/')
+
   // Edit state
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
   const editDraftsRef = useRef(new Map<string, string>())
@@ -82,7 +126,9 @@ const Chat = () => {
 
   useEffect(() => {
     if (configQuery.data) {
-      setModel(configQuery.data.models[0].id)
+      if (configQuery.data.models.length > 0) {
+        setModel(configQuery.data.models[0].id)
+      }
     }
   }, [configQuery.data])
 
@@ -90,7 +136,9 @@ const Chat = () => {
     setEditingMessageId(null)
     if (conversationId === '/') {
       setMessages([])
+      setMessagesLoaded(true)
     } else {
+      setMessagesLoaded(false)
       getMessages(conversationId)
         .then((storedMessages) => {
           if (storedMessages) {
@@ -102,9 +150,11 @@ const Chat = () => {
               setSendTrigger((n) => n + 1)
             }
           }
+          setMessagesLoaded(true)
         })
         .catch((err: unknown) => {
           console.error('Failed to load messages:', err)
+          setMessagesLoaded(true)
         })
     }
     textareaRef.current?.focus()
@@ -245,10 +295,32 @@ const Chat = () => {
   }, [configQuery.data, model])
 
   if (conversationId !== '/' && messages.length === 0) {
-    return null
+    return (
+      <div className="flex h-full items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-primary" />
+      </div>
+    )
+  }
+
+  if (configQuery.isError) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
+        <p className="text-destructive font-semibold text-lg">Unable to connect to the server.</p>
+        <p className="text-muted-foreground text-sm">
+          Could not load configuration from <code>/api/configure</code>. Please check that the server is running.
+        </p>
+        <button
+          className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90"
+          onClick={() => configQuery.refetch()}
+        >
+          Retry
+        </button>
+      </div>
+    )
   }
 
   return (
+    <ChatErrorBoundary>
     <>
       <Conversation className="h-full">
         <ConversationContent>
@@ -409,6 +481,7 @@ const Chat = () => {
         onFork={handleFork}
       />
     </>
+    </ChatErrorBoundary>
   )
 }
 
