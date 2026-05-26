@@ -213,7 +213,11 @@ DATABASE_SCHEMA:{current_schema_memory_data}
     return f"{current_db_schema_memory}\n{business_rules}\n{current_app_context}\n{migration_plan}\n{migration_rules}"
 
 
-server = MCPServerStreamableHTTP('http://localhost:8000/mcp')  
+server = MCPServerStreamableHTTP(
+    'http://localhost:8000/mcp',
+    timeout=30,
+    read_timeout=3600,
+)  
 
 agent = Agent(instructions=f"""You are an expert SQL, Database, and Migration Assistant specializing in database querying, schema management, data transformation, and migration workflows.
 

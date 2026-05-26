@@ -4,6 +4,7 @@ import logfire
 import json
 import psycopg2
 import logging
+import asyncio
 from psycopg2 import sql
 from typing import Any
 from urllib.parse import parse_qs, urlsplit, urlunsplit
@@ -53,6 +54,20 @@ except ImportError:
 # 'if-token-present' means nothing will be sent (and the example will work) if you don't have logfire configured
 logfire.configure(send_to_logfire='if-token-present')
 logfire.instrument_pydantic_ai()
+
+
+# Handle broken stream errors gracefully
+def handle_exception(loop, context):
+    """Global exception handler for unhandled exceptions in async tasks."""
+    exception = context.get('exception')
+    if exception and 'BrokenResourceError' in str(type(exception).__name__):
+        # Log but don't propagate - client disconnected during streaming
+        logger.debug("Client disconnected during streaming (BrokenResourceError)")
+        return
+    
+    # For other exceptions, log them
+    logger.error("Unhandled exception in event loop: %s", context.get('message', str(exception)), 
+                 exc_info=exception if exception else None)
 
 models={
         'GPT 5.2': 'openai:gpt-5.2',
@@ -837,6 +852,9 @@ async def chat_endpoint(request: Request):
         except Exception as e:
             logger.debug("Could not extract userName from request: %s", e)
 
+        # Return the adapter streaming response untouched. Wrapping body_iterator here
+        # breaks pydantic-ai's internal stream lifecycle and can surface as
+        # BrokenResourceError while the agent is sending post-tool events.
         return await VercelAIAdapter.dispatch_request(
             request,
             agent=agent,
@@ -845,6 +863,7 @@ async def chat_endpoint(request: Request):
             instructions=build_runtime_instructions(user_name),
         )
     except Exception as e:
+        logger.error("Chat request failed: %s", str(e), exc_info=True)
         return JSONResponse({'error': f'Chat request failed: {str(e)}'}, status_code=500)
 
 
@@ -994,6 +1013,7 @@ async def migrate_columns_endpoint(request: Request):
                             "table": table['table_name'],
                             "error": str(e),
                         })
+                        logger.error(f"Migration failed for {table['table_name']}: {str(e)}", exc_info=True)
 
         # Count successes/failures
         successes = sum(
@@ -1004,83 +1024,6 @@ async def migrate_columns_endpoint(request: Request):
             1 for r in migration_results
             if r.get('status') == 'FAILURE'
         )
-
-        # Record successful migrations to migration-history.json on the server
-        if successes > 0:
-            try:
-                from datetime import datetime
-                config_dir = ROOT_DIR.parent / 'config'
-                if not config_dir.exists():
-                    config_dir = ROOT_DIR / 'config'
-                config_dir.mkdir(exist_ok=True)
-                history_file = config_dir / 'migration-history.json'
-
-                # Load existing history
-                if history_file.exists():
-                    try:
-                        with open(history_file, 'r') as f:
-                            history_data = json.load(f)
-                    except Exception:
-                        history_data = {}
-                else:
-                    history_data = {}
-
-                # Initialize structure if empty
-                if not history_data:
-                    history_data = {
-                        'version': '1.0',
-                        'lastUpdated': datetime.utcnow().isoformat() + 'Z',
-                        'totalMigrations': 0,
-                        'schemasAnalyzed': 0,
-                        'tableMigrations': [],
-                        'records': [],
-                    }
-
-                if 'records' not in history_data:
-                    history_data['records'] = history_data.get('migrations', [])
-                if 'tableMigrations' not in history_data:
-                    history_data['tableMigrations'] = []
-
-                timestamp = datetime.utcnow().isoformat() + 'Z'
-                successful_tables = [r for r in migration_results if r.get('status') == 'SUCCESS']
-
-                table_details = []
-                for r in successful_tables:
-                    table_name = r.get('table', 'Unknown')
-                    detail = {
-                        'tableName': table_name,
-                        'sourceDatabase': payload.get('database', 'PostgreSQL'),
-                        'targetDatabase': 'Snowflake',
-                        'rowsMigrated': r.get('rows_migrated', 0),
-                        'columnsCount': r.get('columns', 0),
-                        'timestamp': timestamp,
-                        'status': 'success',
-                    }
-                    table_details.append(detail)
-                    history_data['tableMigrations'].append(detail)
-
-                record = {
-                    'id': f"migration-api-{int(datetime.utcnow().timestamp() * 1000)}",
-                    'timestamp': timestamp,
-                    'userId': 'user',
-                    'userName': 'User',
-                    'schemasCount': len(successful_tables),
-                    'tablesCount': len(successful_tables),
-                    'tables': table_details,
-                }
-
-                history_data['records'].append(record)
-                history_data['totalMigrations'] = len(history_data['records'])
-                history_data['schemasAnalyzed'] = history_data.get('schemasAnalyzed', 0) + len(successful_tables)
-                history_data['lastUpdated'] = timestamp
-                history_data['migrations'] = history_data['records']
-
-                with open(history_file, 'w') as f:
-                    json.dump(history_data, f, indent=2, default=str)
-
-                logger.info("Recorded %d successful migration(s) to migration-history.json", successes)
-            except Exception as e:
-                logger.error("Failed to record migration history: %s", e)
 
         return JSONResponse({
             'success': True,
@@ -1093,6 +1036,7 @@ async def migrate_columns_endpoint(request: Request):
         })
 
     except Exception as e:
+        logger.error(f'Migration error: {str(e)}', exc_info=True)
         return JSONResponse(
             {'detail': f'Migration error: {str(e)}'}, 
             status_code=500
@@ -1226,3 +1170,11 @@ app = agent.to_web(instructions=explicit_memory,
                      models=models)
 app.add_middleware(AgentDetailsMiddleware)
 logfire.instrument_starlette(app)
+
+
+# Set up exception handler for the event loop
+@app.on_event("startup")
+async def setup_exception_handler():
+    """Set up global exception handler for unhandled task exceptions."""
+    loop = asyncio.get_event_loop()
+    loop.set_exception_handler(handle_exception)

@@ -180,21 +180,30 @@ export function Part({
   } else if (part.type === 'dynamic-tool') {
     return <>Dynamic Tool, TODO {JSON.stringify(part)}</>
   } else if ('toolCallId' in part) {
-    // return <div>{JSON.stringify(part)}</div>
-    return (
-      <Tool>
-        <ToolHeader type={part.type} state={part.state} />
-        <ToolContent>
-          <ToolInput input={part.input} />
-          {(part.state === 'output-available' || part.state === 'output-error') && (
-            <ToolOutput
-              errorText={part.errorText}
-              output={<CodeBlock code={JSON.stringify(part.output, null, 2)} language="json" />}
-            />
-          )}
-        </ToolContent>
-      </Tool>
-    )
+    try {
+      return (
+        <Tool>
+          <ToolHeader type={part.type} state={part.state} />
+          <ToolContent>
+            <ToolInput input={part.input} />
+            {(part.state === 'output-available' || part.state === 'output-error') && (
+              <ToolOutput
+                errorText={part.errorText}
+                output={<CodeBlock code={JSON.stringify(part.output, null, 2)} language="json" />}
+              />
+            )}
+          </ToolContent>
+        </Tool>
+      )
+    } catch (toolRenderError) {
+      console.error('Error rendering tool:', toolRenderError, part)
+      return (
+        <div className="p-3 rounded-md border border-red-200 bg-red-50 dark:bg-red-950">
+          <p className="text-sm text-red-700 dark:text-red-200">Failed to render tool output</p>
+          <pre className="mt-2 text-xs overflow-auto whitespace-pre-wrap break-words">{JSON.stringify(part, null, 2)}</pre>
+        </div>
+      )
+    }
   }
 }
 

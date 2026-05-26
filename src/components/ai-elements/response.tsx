@@ -48,8 +48,12 @@ class StreamdownErrorBoundary extends Component<
   }
 }
 
+function getRawResponseContent(children: ReactNode): string | undefined {
+  return typeof children === 'string' ? children : undefined
+}
+
 export const Response = memo(({ className, ...props }: ResponseProps) => (
-  <StreamdownErrorBoundary rawContent={typeof props.content === 'string' ? props.content : typeof props.children === 'string' ? props.children : undefined}>
+  <StreamdownErrorBoundary rawContent={getRawResponseContent(props.children)}>
     <Streamdown
       className={cn('size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 code-bg prose prose-sm dark:prose-invert max-w-none', className)}
       {...props}

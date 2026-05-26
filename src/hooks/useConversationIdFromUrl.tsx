@@ -27,6 +27,7 @@ export function useConversationIdFromUrl(): [string, (id: string) => void] {
     const url = new URL(window.location.toString())
     url.pathname = withBasePath(id || '/')
     window.history.pushState({}, '', url.toString())
+    window.dispatchEvent(new Event('history-state-changed'))
   }
 
   return [conversationId, setConversationIdAndUrl]

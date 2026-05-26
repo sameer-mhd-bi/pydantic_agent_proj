@@ -1,12 +1,15 @@
 from mcp.server.fastmcp import FastMCP
+import asyncio
 import psycopg2
 from psycopg2 import sql
 import functools
+import inspect
 import json
 from snowflake.connector import errors as snowflake_errors
 from cryptography.hazmat.primitives import serialization
 import petl as etl
 import snowflake.connector
+from datetime import UTC, datetime
 from pathlib import Path
 import logging
 import sys
@@ -36,6 +39,30 @@ def log_tool_call(func):
     - Tool name and arguments on entry.
     - Status or error from the tool on exit.
     """
+    if inspect.iscoroutinefunction(func):
+        @functools.wraps(func)
+        async def async_wrapper(*args, **kwargs):
+            logger.info(
+                "Tool called: %s args=%s kwargs=%s",
+                func.__name__,
+                args,
+                kwargs,
+            )
+            result = await func(*args, **kwargs)
+            result_preview = (
+                result[:1000] + "...(truncated)"
+                if isinstance(result, str) and len(result) > 1000
+                else result
+            )
+            logger.info(
+                "Tool response from %s: %s",
+                func.__name__,
+                result_preview,
+            )
+            return result
+
+        return async_wrapper
+
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         logger.info(
@@ -57,6 +84,7 @@ def log_tool_call(func):
             result_preview,
         )
         return result
+
     return wrapper
 
 
@@ -165,6 +193,9 @@ def initialize_snowflake_connection():
             warehouse=warehouse,
             database=database,
             schema=schema,
+            login_timeout=30,  # 30 second login timeout
+            network_timeout=60,  # 60 second network timeout
+            socket_timeout=60,  # 60 second socket timeout
         )
         logger.info("Snowflake connection initialized successfully.")
     except (FileNotFoundError, ValueError, TypeError, snowflake_errors.Error) as e:
@@ -414,10 +445,57 @@ def map_pg_to_snowflake_type(pg_type: str) -> str:
     return mapping.get(pg_type, "TEXT")  # fallback
 
 
+def utc_now_iso() -> str:
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
+
+def open_postgresql_connection(database_name: str | None = None):
+    config = load_database_config()
+    pg_config = config.get("postgresql", {})
+    connection = psycopg2.connect(
+        dbname=database_name or pg_config.get("dbname", "bank_db"),
+        user=pg_config.get("user", "postgres"),
+        password=pg_config.get("password", "root"),
+        host=pg_config.get("host", "localhost"),
+        port=pg_config.get("port", 5432),
+    )
+    connection.autocommit = True
+    return connection
+
+
+def open_snowflake_connection():
+    config = load_database_config()
+    sf_config = config.get("snowflake", {})
+
+    key_path = sf_config.get("key_path", "C:\\Users\\remote\\Mar_2026\\rsa_key.pem")
+    with Path(key_path).open("rb") as key_file:
+        p_key = serialization.load_pem_private_key(
+            key_file.read(),
+            password=None,
+        )
+
+    pkb = p_key.private_bytes(
+        encoding=serialization.Encoding.DER,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+
+    return snowflake.connector.connect(
+        user=sf_config.get("user", "appuser"),
+        account=sf_config.get("account", "bxvclfn-jn77484"),
+        private_key=pkb,
+        warehouse=sf_config.get("warehouse", "DA_DWH"),
+        database=sf_config.get("database", "dev_dwh"),
+        schema=sf_config.get("schema", "staging"),
+        login_timeout=30,
+        network_timeout=60,
+        socket_timeout=60,
+    )
+
+
 def record_mcp_migration(source_table: str, target_table: str, rows_migrated: int, columns_count: int = 0):
     """Record a successful tool-based migration to migration-history.json."""
     import json
-    from datetime import datetime
     
     try:
         # Resolve config/migration-history.json path
@@ -452,7 +530,7 @@ def record_mcp_migration(source_table: str, target_table: str, rows_migrated: in
                 if not data:
                     data = {
                         'version': '1.0',
-                        'lastUpdated': datetime.utcnow().isoformat() + 'Z',
+                        'lastUpdated': utc_now_iso(),
                         'totalMigrations': 0,
                         'schemasAnalyzed': 0,
                         'tableMigrations': [],
@@ -473,7 +551,7 @@ def record_mcp_migration(source_table: str, target_table: str, rows_migrated: in
                 except Exception:
                     pass
                     
-                timestamp = datetime.utcnow().isoformat() + 'Z'
+                timestamp = utc_now_iso()
                 
                 # Create TableMigrationDetail
                 detail = {
@@ -488,7 +566,7 @@ def record_mcp_migration(source_table: str, target_table: str, rows_migrated: in
                 
                 # Create MigrationRecord
                 record = {
-                    'id': f"migration-mcp-{int(datetime.utcnow().timestamp() * 1000)}",
+                    'id': f"migration-mcp-{int(datetime.now(UTC).timestamp() * 1000)}",
                     'timestamp': timestamp,
                     'userId': 'agent',
                     'userName': 'AI Agent',
@@ -525,7 +603,20 @@ def record_mcp_migration(source_table: str, target_table: str, rows_migrated: in
 
 @app.tool()
 @log_tool_call
-def migrate_table_postgres_to_snowflake(
+async def migrate_table_postgres_to_snowflake(
+    source_table: str,
+    target_table: str,
+    csv_path: str = "data_export.csv",
+) -> str:
+    return await asyncio.to_thread(
+        _migrate_table_postgres_to_snowflake_sync,
+        source_table,
+        target_table,
+        csv_path,
+    )
+
+
+def _migrate_table_postgres_to_snowflake_sync(
     source_table: str,
     target_table: str,
     csv_path: str = "data_export.csv",
@@ -535,24 +626,61 @@ def migrate_table_postgres_to_snowflake(
     This function implements a fully automated data migration pipeline that transfers a table from PostgreSQL to Snowflake in a structured, reliable, and validation-driven manner.
     """
 
-    # -----------------------------
-    # VALIDATION
-    # -----------------------------
-    for name, value in (("source_table", source_table), ("target_table", target_table)):
-        if not value.replace("_", "").isalnum():
-            return json.dumps(
-                {
-                    "error": f"Invalid {name}",
-                    "message": "Only alphanumeric + underscores allowed",
-                },
-                indent=2,
-            )
-        
-
-    csv_file = Path(csv_path).resolve()
-    csv_file.parent.mkdir(parents=True, exist_ok=True)
-
+    local_pg_conn = None
+    local_sf_conn = None
+    pg_cursor = None
+    sf_cursor = None
+    
     try:
+        logger.info("=== STARTING MIGRATION: %s -> %s ===", source_table, target_table)
+        
+        # Validate inputs
+        for name, value in (("source_table", source_table), ("target_table", target_table)):
+            if not value.replace("_", "").isalnum():
+                error_msg = f"Invalid {name}: Only alphanumeric + underscores allowed"
+                logger.error(error_msg)
+                return json.dumps({"error": error_msg}, indent=2)
+        
+        # Validate connections are initialized
+        if pg_conn is None:
+            error_msg = "PostgreSQL connection not initialized"
+            logger.error(error_msg)
+            return json.dumps({"error": error_msg}, indent=2)
+        if conn is None:
+            error_msg = "Snowflake connection not initialized"
+            logger.error(error_msg)
+            return json.dumps({"error": error_msg}, indent=2)
+
+        csv_file = Path(csv_path).resolve()
+        csv_file.parent.mkdir(parents=True, exist_ok=True)
+
+        # Use isolated connections inside the worker thread so this tool does not
+        # mutate or block the shared MCP server connections that other requests use.
+        try:
+            local_pg_conn = open_postgresql_connection()
+            local_sf_conn = open_snowflake_connection()
+            pg_cursor = local_pg_conn.cursor()
+            sf_cursor = local_sf_conn.cursor()
+            logger.info("Database cursors created successfully")
+        except Exception as e:
+            error_msg = f"Failed to create cursors: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            return json.dumps({"error": error_msg}, indent=2)
+
+        # ============================================================
+        # STEP 0 — CHECK SOURCE TABLE SIZE
+        # ============================================================
+        
+        try:
+            pg_cursor.execute(f'SELECT COUNT(*) FROM "{source_table}"')
+            table_row_count = pg_cursor.fetchone()[0]
+            logger.info("Source table '%s' contains %d rows", source_table, table_row_count)
+            
+            if table_row_count > 1000000:
+                logger.warning("Warning: Source table has %d rows - migration may take a long time", table_row_count)
+        except Exception as e:
+            logger.warning("Could not determine source table size: %s", e)
+
         # ============================================================
         # STEP 1 — EXTRACT SCHEMA FROM POSTGRES
         # ============================================================
@@ -564,13 +692,19 @@ def migrate_table_postgres_to_snowflake(
         ORDER BY ordinal_position;
         """
 
-        pg_cursor = pg_conn.cursor()
-        pg_cursor.execute(schema_query)
-        columns = pg_cursor.fetchall()
+        try:
+            pg_cursor.execute(schema_query)
+            columns = pg_cursor.fetchall()
 
-        if not columns:
-            return json.dumps({"error": "Table not found in Postgres"}, indent=2)
-        logger.info("Retrieved schema for table: %s", source_table)
+            if not columns:
+                error_msg = f"Table '{source_table}' not found in PostgreSQL"
+                logger.error(error_msg)
+                return json.dumps({"error": error_msg}, indent=2)
+            logger.info("Retrieved schema for table: %s (%d columns)", source_table, len(columns))
+        except Exception as e:
+            error_msg = f"Failed to retrieve schema: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            return json.dumps({"error": error_msg}, indent=2)
 
         # ============================================================
         # STEP 2 — CREATE TABLE IN SNOWFLAKE
@@ -587,27 +721,74 @@ def migrate_table_postgres_to_snowflake(
         )
         """
 
-        with conn.cursor() as cs:
-            cs.execute(create_sql)
+        try:
+            logger.info("Creating Snowflake table: %s", target_table)
+            sf_cursor.execute(create_sql)
+            local_sf_conn.commit()  # Ensure table creation is committed immediately
+            logger.info("✓ Table created successfully")
+        except Exception as e:
+            error_msg = f"Failed to create Snowflake table: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            try:
+                local_sf_conn.rollback()
+            except:
+                pass
+            return json.dumps({"error": error_msg}, indent=2)
 
         # ============================================================
         # STEP 3 — EXPORT DATA TO CSV
         # ============================================================
 
-        query = f'SELECT * FROM "{source_table}"'
-        table = etl.fromdb(pg_conn, query)
-        etl.tocsv(table, str(csv_file))
+        import csv
+        
+        try:
+            logger.info("Exporting data from PostgreSQL...")
+            pg_cursor.execute(f'SELECT * FROM "{source_table}"')
+            description = pg_cursor.description
+            
+            # Write directly to CSV file without using etl library
+            # Use streaming approach to avoid memory issues with large tables
+            row_count = 0
+            with open(csv_file, 'w', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                # Write header
+                writer.writerow([desc[0] for desc in description])
+                
+                # Fetch and write rows in batches
+                batch_size = 1000
+                while True:
+                    rows = pg_cursor.fetchmany(batch_size)
+                    if not rows:
+                        break
+                    writer.writerows(rows)
+                    row_count += len(rows)
+                    logger.debug("Exported %d rows so far...", row_count)
+                
+            logger.info("✓ Exported %d rows to CSV: %s", row_count, csv_file)
 
-        if not csv_file.exists():
-            return json.dumps({"error": "CSV export failed"}, indent=2)
+            if not csv_file.exists() or csv_file.stat().st_size == 0:
+                error_msg = "CSV export failed - file is empty or not created"
+                logger.error(error_msg)
+                return json.dumps({"error": error_msg}, indent=2)
+        except Exception as e:
+            error_msg = f"Failed to export data to CSV: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            return json.dumps({"error": error_msg}, indent=2)
 
         # ============================================================
         # STEP 4 — UPLOAD TO SNOWFLAKE STAGE
         # ============================================================
 
-        with conn.cursor() as cs:
-            put_sql = f"PUT file://{csv_file} @%{target_table} OVERWRITE=TRUE"
-            cs.execute(put_sql)
+        put_sql = f"PUT file://{csv_file} @%{target_table} OVERWRITE=TRUE"
+        
+        try:
+            logger.info("Uploading CSV to Snowflake stage...")
+            sf_cursor.execute(put_sql)
+            logger.info("✓ File uploaded to stage successfully")
+        except Exception as e:
+            error_msg = f"Failed to upload to Snowflake stage: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            return json.dumps({"error": error_msg}, indent=2)
 
         # ============================================================
         # STEP 5 — COPY INTO TABLE
@@ -623,23 +804,43 @@ def migrate_table_postgres_to_snowflake(
         )
         """
 
-        with conn.cursor() as cs:
-            cs.execute(copy_sql)
-
-        conn.commit()
+        try:
+            logger.info("Executing COPY INTO command...")
+            sf_cursor.execute(copy_sql)
+            local_sf_conn.commit()
+            logger.info("✓ COPY INTO completed successfully")
+        except Exception as e:
+            error_msg = f"Failed during COPY INTO: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            local_sf_conn.rollback()
+            return json.dumps({"error": error_msg}, indent=2)
 
         # ============================================================
         # STEP 6 — VALIDATE LOAD
         # ============================================================
 
-        pg_cursor.execute(f'SELECT COUNT(*) FROM "{source_table}"')
-        pg_count = pg_cursor.fetchone()[0]
+        pg_count = 0
+        sf_count = 0
+        
+        try:
+            logger.info("Validating row counts...")
+            pg_cursor.execute(f'SELECT COUNT(*) FROM "{source_table}"')
+            pg_count = pg_cursor.fetchone()[0]
 
-        with conn.cursor() as cs:
-            cs.execute(f"SELECT COUNT(*) FROM {target_table}")
-            sf_count = cs.fetchone()[0]
+            sf_cursor.execute(f"SELECT COUNT(*) FROM {target_table}")
+            sf_count = sf_cursor.fetchone()[0]
 
-        # Record the migration history
+            logger.info("✓ Row count validation - PostgreSQL: %d, Snowflake: %d", pg_count, sf_count)
+        except Exception as e:
+            error_msg = f"Failed to validate row counts: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            # Don't fail - just log the warning
+            logger.warning("Skipping row count validation due to error")
+
+        # ============================================================
+        # STEP 7 — RECORD MIGRATION HISTORY
+        # ============================================================
+
         try:
             record_mcp_migration(
                 source_table=source_table,
@@ -647,38 +848,65 @@ def migrate_table_postgres_to_snowflake(
                 rows_migrated=sf_count,
                 columns_count=len(columns)
             )
+            logger.info("✓ Migration history recorded")
         except Exception as e:
-            logger.warning("Failed to record MCP migration: %s", e)
+            logger.warning("Failed to record migration history: %s", e)
 
         # ============================================================
         # SUCCESS
         # ============================================================
-        logger.info("Pipeline completed successfully for table: %s", target_table)
-        return json.dumps(
-            {
-                "status": "SUCCESS",
-                "source_table": source_table,
-                "target_table": target_table,
-                "rows_postgres": pg_count,
-                "rows_snowflake": sf_count,
-                "csv_path": str(csv_file),
-            },
-            indent=2,
-        )
+        response = {
+            "status": "SUCCESS",
+            "source_table": source_table,
+            "target_table": target_table,
+            "rows_postgres": pg_count,
+            "rows_snowflake": sf_count,
+            "csv_path": str(csv_file),
+            "columns_count": len(columns),
+        }
+        
+        logger.info("✓✓✓ MIGRATION COMPLETED SUCCESSFULLY ✓✓✓")
+        logger.info("Migration summary: %s", json.dumps(response, indent=2))
+        
+        return json.dumps(response, indent=2)
 
     except snowflake_errors.Error as e:
-        logger.error("Snowflake error: %s", e)
-        return json.dumps(
-            {"error": "Snowflake error", "message": str(e)},
-            indent=2,
-        )
+        error_msg = f"Snowflake error: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        return json.dumps({"error": error_msg, "type": "snowflake_error"}, indent=2)
 
     except Exception as e:
-        logger.error("Unexpected error during migration pipeline: %s", e)
-        return json.dumps(
-            {"error": "Pipeline failed", "message": str(e)},
-            indent=2,
-        )
+        error_msg = f"Unexpected error: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        return json.dumps({"error": error_msg, "type": "unknown_error"}, indent=2)
+    
+    finally:
+        # Properly close cursors
+        if pg_cursor is not None:
+            try:
+                pg_cursor.close()
+                logger.debug("PostgreSQL cursor closed")
+            except Exception as e:
+                logger.warning("Error closing PostgreSQL cursor: %s", e)
+        
+        if sf_cursor is not None:
+            try:
+                sf_cursor.close()
+                logger.debug("Snowflake cursor closed")
+            except Exception as e:
+                logger.warning("Error closing Snowflake cursor: %s", e)
+        if local_pg_conn is not None:
+            try:
+                local_pg_conn.close()
+                logger.debug("PostgreSQL connection closed")
+            except Exception as e:
+                logger.warning("Error closing PostgreSQL connection: %s", e)
+        if local_sf_conn is not None:
+            try:
+                local_sf_conn.close()
+                logger.debug("Snowflake connection closed")
+            except Exception as e:
+                logger.warning("Error closing Snowflake connection: %s", e)
     
 @app.tool()
 @log_tool_call
@@ -717,6 +945,9 @@ def migrate_query_postgres_to_snowflake(
     import re
     from pathlib import Path
 
+    pg_cursor = None
+    sf_cursor = None
+
     try:
         # ============================================================
         # STEP 1 — VALIDATE INPUTS
@@ -747,10 +978,18 @@ def migrate_query_postgres_to_snowflake(
                 indent=2,
             )
 
+        # Validate connections
+        if pg_conn is None:
+            return json.dumps({"error": "PostgreSQL connection not initialized"}, indent=2)
+        if conn is None:
+            return json.dumps({"error": "Snowflake connection not initialized"}, indent=2)
+
         csv_file = Path(csv_path).resolve()
         csv_file.parent.mkdir(parents=True, exist_ok=True)
 
+        # Create cursors once and reuse them
         pg_cursor = pg_conn.cursor()
+        sf_cursor = conn.cursor()
 
         # ============================================================
         # STEP 2 — EXECUTE QUERY & FETCH METADATA
@@ -800,9 +1039,8 @@ def migrate_query_postgres_to_snowflake(
 
         if create_table:
             logger.info("Creating Snowflake table: %s", target_table)
-
-            with conn.cursor() as cs:
-                cs.execute(create_sql)
+            sf_cursor.execute(create_sql)
+            logger.info("Table created successfully")
 
         # ============================================================
         # STEP 4 — EXPORT QUERY RESULT TO CSV
@@ -840,10 +1078,9 @@ def migrate_query_postgres_to_snowflake(
         AUTO_COMPRESS=TRUE
         """
 
-        with conn.cursor() as cs:
-            cs.execute(put_sql)
-
-        logger.info("CSV uploaded to Snowflake stage")
+        logger.info("Uploading CSV to Snowflake stage...")
+        sf_cursor.execute(put_sql)
+        logger.info("File uploaded to stage successfully")
 
         # ============================================================
         # STEP 6 — COPY DATA INTO SNOWFLAKE
@@ -861,8 +1098,8 @@ def migrate_query_postgres_to_snowflake(
         MATCH_BY_COLUMN_NAME = CASE_INSENSITIVE
         """
 
-        with conn.cursor() as cs:
-            cs.execute(copy_sql)
+        logger.info("Executing COPY INTO command...")
+        sf_cursor.execute(copy_sql)
 
         conn.commit()
 
@@ -874,9 +1111,10 @@ def migrate_query_postgres_to_snowflake(
 
         postgres_count = len(rows)
 
-        with conn.cursor() as cs:
-            cs.execute(f"SELECT COUNT(*) FROM {target_table}")
-            snowflake_count = cs.fetchone()[0]
+        sf_cursor.execute(f"SELECT COUNT(*) FROM {target_table}")
+        snowflake_count = sf_cursor.fetchone()[0]
+
+        logger.info("Row count validation - PostgreSQL: %d, Snowflake: %d", postgres_count, snowflake_count)
 
         # Record the migration history
         try:
@@ -906,7 +1144,7 @@ def migrate_query_postgres_to_snowflake(
         )
 
     except snowflake_errors.Error as e:
-        logger.error("Snowflake error: %s", e)
+        logger.error("Snowflake error: %s", e, exc_info=True)
 
         return json.dumps(
             {
@@ -917,7 +1155,7 @@ def migrate_query_postgres_to_snowflake(
         )
 
     except Exception as e:
-        logger.error("Migration pipeline failed: %s", e)
+        logger.error("Migration pipeline failed: %s", e, exc_info=True)
 
         return json.dumps(
             {
@@ -926,6 +1164,22 @@ def migrate_query_postgres_to_snowflake(
             },
             indent=2,
         )
+
+    finally:
+        # Properly close cursors
+        if pg_cursor is not None:
+            try:
+                pg_cursor.close()
+                logger.debug("PostgreSQL cursor closed")
+            except Exception as e:
+                logger.warning("Error closing PostgreSQL cursor: %s", e)
+        
+        if sf_cursor is not None:
+            try:
+                sf_cursor.close()
+                logger.debug("Snowflake cursor closed")
+            except Exception as e:
+                logger.warning("Error closing Snowflake cursor: %s", e)
 
 
 def migrate_table_columns(

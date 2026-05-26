@@ -32,7 +32,7 @@ import { Part } from './Part'
 import type { ConversationEntry } from './types'
 import { getToolIcon } from '@/lib/tool-icons'
 import { getMessages, saveMessages, saveConversation } from '@/lib/chat-db'
-import { stripBasePath, withBasePath } from '@/lib/base-path'
+import { stripBasePath } from '@/lib/base-path'
 
 interface ErrorBoundaryProps {
   children: ReactNode
@@ -108,12 +108,11 @@ const Chat = () => {
   const { currentUser } = useAuth()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  const [messagesLoaded, setMessagesLoaded] = useState(() => conversationId === '/')
-
   // Edit state
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
   const editDraftsRef = useRef(new Map<string, string>())
   const [pendingEdit, setPendingEdit] = useState<{ messageId: string; text: string } | null>(null)
+  const [displayedError, setDisplayedError] = useState<string | null>(null)
   // Deferred send: set this ref, then call setMessages. The useEffect below
   // will fire sendMessage after the messages state has been committed.
   const pendingSendRef = useRef<{ text: string; model: string; builtinTools: string[] } | null>(null)
@@ -136,9 +135,7 @@ const Chat = () => {
     setEditingMessageId(null)
     if (conversationId === '/') {
       setMessages([])
-      setMessagesLoaded(true)
     } else {
-      setMessagesLoaded(false)
       getMessages(conversationId)
         .then((storedMessages) => {
           if (storedMessages) {
@@ -150,30 +147,43 @@ const Chat = () => {
               setSendTrigger((n) => n + 1)
             }
           }
-          setMessagesLoaded(true)
         })
         .catch((err: unknown) => {
           console.error('Failed to load messages:', err)
-          setMessagesLoaded(true)
         })
     }
     textareaRef.current?.focus()
   }, [conversationId])
 
+  // Track and display streaming/tool errors
+  useEffect(() => {
+    if (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      setDisplayedError(errorMessage)
+      console.error('Chat error detected:', errorMessage)
+    } else if (status !== 'streaming' && status !== 'submitted') {
+      // Clear error when not actively streaming
+      setDisplayedError(null)
+    }
+  }, [error, status])
+
   const handleSubmit = (e: SyntheticEvent) => {
     e.preventDefault()
     if (input.trim()) {
-      const theCurrentUrl = new URL(window.location.toString())
-
       // we're starting a new conversation
-      if (stripBasePath(theCurrentUrl.pathname) === '/') {
+      if (stripBasePath(window.location.pathname) === '/') {
         const newConversationId = `/${nanoid()}`
         setConversationId(newConversationId)
 
         saveConversationEntry(newConversationId, input, undefined, currentUser?.id)
 
-        theCurrentUrl.pathname = withBasePath(newConversationId)
-        window.history.pushState({}, '', theCurrentUrl.toString())
+        // Defer the first send until the conversation switch has committed.
+        // Sending immediately here races with the conversationId effect below,
+        // which clears/loads messages for the new route and can abort the SSE stream.
+        pendingSendRef.current = { text: input, model, builtinTools: enabledTools }
+        setInput('')
+        setSendTrigger((n) => n + 1)
+        return
       }
 
       sendMessage(
@@ -181,8 +191,9 @@ const Chat = () => {
         {
           body: { model, builtinTools: enabledTools, userName: currentUser?.fullName },
         },
-      ).catch((error: unknown) => {
-        console.error('Error sending message:', error)
+      ).catch((sendError: unknown) => {
+        console.error('Error sending message:', sendError)
+        // Error will be displayed via the error state from useChat
       })
       setInput('')
     }
@@ -194,8 +205,9 @@ const Chat = () => {
     const pending = pendingSendRef.current
     pendingSendRef.current = null
     sendMessage({ text: pending.text }, { body: { model: pending.model, builtinTools: pending.builtinTools, userName: currentUser?.fullName } }).catch(
-      (error: unknown) => {
-        console.error('Error sending deferred message:', error)
+      (deferredError: unknown) => {
+        console.error('Error sending deferred message:', deferredError)
+        // Error will be displayed via the error state from useChat
       },
     )
   }, [sendTrigger])
@@ -207,6 +219,26 @@ const Chat = () => {
       })
     }
   }, [throttledMessages, conversationId])
+
+  // Debug: Log streaming status for tool calls
+  useEffect(() => {
+    const lastMessage = messages[messages.length - 1]
+    if (lastMessage?.role === 'assistant') {
+      const hasToolCalls = lastMessage.parts.some((p) => 'toolCallId' in p)
+      const hasPendingTools = lastMessage.parts.some((p) => 'toolCallId' in p && (p as any).state === 'input-available')
+      if (hasToolCalls) {
+        console.log('Tool call status:', { status, hasPendingTools, toolCount: lastMessage.parts.filter((p) => 'toolCallId' in p).length, lastMessage })
+        
+        // If tools are pending for more than 30 seconds, log warning
+        if (hasPendingTools && status === 'streaming') {
+          const timeout = setTimeout(() => {
+            console.warn('Tool call appears to be stuck for >30s', lastMessage)
+          }, 30000)
+          return () => clearTimeout(timeout)
+        }
+      }
+    }
+  }, [messages, status])
 
   const handleStartEdit = useCallback((messageId: string) => {
     setEditingMessageId(messageId)
@@ -284,8 +316,9 @@ const Chat = () => {
   )
 
   function regen(messageId: string) {
-    regenerate({ messageId }).catch((error: unknown) => {
-      console.error('Error regenerating message:', error)
+    regenerate({ messageId }).catch((regenError: unknown) => {
+      console.error('Error regenerating message:', regenError)
+      // Error will be displayed via the error state from useChat
     })
   }
 
@@ -361,9 +394,18 @@ const Chat = () => {
             </div>
           ))}
           {status === 'submitted' && <div className="flex justify-start"><Loader /></div>}
-          {status === 'error' && error && (
-            <div className="px-4 py-3 mx-4 my-2 bg-destructive/10 border border-destructive/20 rounded-md text-destructive text-sm">
-              <strong>Error:</strong> {error.message}
+          {displayedError && (
+            <div className="px-4 py-3 mx-4 my-2 bg-destructive/10 border border-destructive/20 rounded-md text-destructive text-sm flex items-start justify-between gap-4">
+              <div>
+                <strong>Error:</strong> {displayedError}
+              </div>
+              <button
+                onClick={() => setDisplayedError(null)}
+                className="flex-shrink-0 text-destructive/60 hover:text-destructive"
+                aria-label="Dismiss error"
+              >
+                ✕
+              </button>
             </div>
           )}
         </ConversationContent>

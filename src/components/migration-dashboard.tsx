@@ -48,12 +48,8 @@ export function MigrationDashboard() {
     // Listen to custom event for instant updates
     window.addEventListener('migration-stats-updated', handleStatsUpdate)
     
-    // Poll every 3 seconds
-    const pollInterval = setInterval(handleStatsUpdate, 3000)
-    
     return () => {
       window.removeEventListener('migration-stats-updated', handleStatsUpdate)
-      clearInterval(pollInterval)
     }
   }, [])
 

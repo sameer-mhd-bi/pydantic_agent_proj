@@ -22,6 +22,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 const queryClient = new QueryClient()
 
+// Global unhandled rejection handler to catch streaming and async errors
+if (typeof window !== 'undefined') {
+  window.addEventListener('unhandledrejection', (event) => {
+    console.error('Unhandled promise rejection:', event.reason)
+    // Log error but don't prevent default to allow graceful handling
+  })
+}
+
 function AppContent() {
   const [ready, setReady] = useState(false)
   const [route] = useConversationIdFromUrl()
