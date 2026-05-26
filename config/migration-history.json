@@ -1,8 +1,8 @@
 {
   "version": "1.0",
-  "lastUpdated": "2026-05-25T16:33:00.303Z",
-  "totalMigrations": 5,
-  "schemasAnalyzed": 6,
+  "lastUpdated": "2026-05-26T05:04:21.552Z",
+  "totalMigrations": 8,
+  "schemasAnalyzed": 9,
   "records": [
     {
       "id": "migration-1779710333804",
@@ -107,6 +107,63 @@
           "status": "success"
         }
       ]
+    },
+    {
+      "id": "migration-api-1779751429327",
+      "timestamp": "2026-05-26T04:53:49.327907Z",
+      "userId": "user",
+      "userName": "User",
+      "schemasCount": 1,
+      "tablesCount": 1,
+      "tables": [
+        {
+          "tableName": "electric_vehicle_data",
+          "sourceDatabase": "bank_db",
+          "targetDatabase": "Snowflake",
+          "rowsMigrated": 0,
+          "columnsCount": 16,
+          "timestamp": "2026-05-26T04:53:49.327907Z",
+          "status": "success"
+        }
+      ]
+    },
+    {
+      "id": "migration-1779771405192",
+      "timestamp": "2026-05-26T04:56:45.192Z",
+      "userId": "admin-001",
+      "userName": "admin",
+      "schemasCount": 1,
+      "tablesCount": 1,
+      "tables": [
+        {
+          "tableName": "electric_vehicle_data",
+          "sourceDatabase": "bank_db",
+          "targetDatabase": "bank_db",
+          "rowsMigrated": 0,
+          "columnsCount": 0,
+          "timestamp": "2026-05-26T04:56:45.192Z",
+          "status": "success"
+        }
+      ]
+    },
+    {
+      "id": "migration-1779771861552",
+      "timestamp": "2026-05-26T05:04:21.552Z",
+      "userId": "admin-001",
+      "userName": "admin",
+      "schemasCount": 1,
+      "tablesCount": 1,
+      "tables": [
+        {
+          "tableName": "electric_vehicle_data",
+          "sourceDatabase": "bank_db",
+          "targetDatabase": "bank_db",
+          "rowsMigrated": 0,
+          "columnsCount": 0,
+          "timestamp": "2026-05-26T05:04:21.551Z",
+          "status": "success"
+        }
+      ]
     }
   ],
   "tableMigrations": [
@@ -162,6 +219,33 @@
       "rowsMigrated": 0,
       "columnsCount": 6,
       "timestamp": "2026-05-25T16:33:00.303Z",
+      "status": "success"
+    },
+    {
+      "tableName": "electric_vehicle_data",
+      "sourceDatabase": "bank_db",
+      "targetDatabase": "Snowflake",
+      "rowsMigrated": 0,
+      "columnsCount": 16,
+      "timestamp": "2026-05-26T04:53:49.327907Z",
+      "status": "success"
+    },
+    {
+      "tableName": "electric_vehicle_data",
+      "sourceDatabase": "bank_db",
+      "targetDatabase": "bank_db",
+      "rowsMigrated": 0,
+      "columnsCount": 16,
+      "timestamp": "2026-05-26T04:56:45.191Z",
+      "status": "success"
+    },
+    {
+      "tableName": "electric_vehicle_data",
+      "sourceDatabase": "bank_db",
+      "targetDatabase": "bank_db",
+      "rowsMigrated": 0,
+      "columnsCount": 16,
+      "timestamp": "2026-05-26T05:04:21.551Z",
       "status": "success"
     }
   ]

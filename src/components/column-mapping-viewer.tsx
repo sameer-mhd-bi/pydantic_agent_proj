@@ -74,7 +74,7 @@ export function ColumnMappingViewer({
     } else {
       setExpandedTables([])
     }
-  }, [expandAll, tables])
+  }, [expandAll])
 
   const toggleTableExpand = (table: string) => {
     setExpandedTables((prev) =>
@@ -107,7 +107,11 @@ export function ColumnMappingViewer({
     })
   }
 
-  const handleMigrateClick = async () => {
+  const handleMigrateClick = async (e?: React.MouseEvent<HTMLButtonElement>) => {
+    if (e) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
     setMigrationResults([])
     try {
       await onMigrate(tables)
@@ -142,6 +146,7 @@ export function ColumnMappingViewer({
               className="border rounded-lg overflow-hidden"
             >
               <button
+                type="button"
                 onClick={() =>
                   toggleTableExpand(
                     table.table_name,
@@ -283,6 +288,7 @@ export function ColumnMappingViewer({
 
       <div className="flex justify-end">
         <Button
+          type="button"
           onClick={handleMigrateClick}
           disabled={
             isMigrating ||

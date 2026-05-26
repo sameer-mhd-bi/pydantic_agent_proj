@@ -432,6 +432,13 @@ export function DatabaseExplorerPage() {
       setHasAutoSelectedTables(true)
     }
 
+    const savedExpandAllTables = localStorage.getItem(
+      getStorageKey('db-explorer-expand-all-tables'),
+    )
+    if (savedExpandAllTables === 'true') {
+      setExpandAllTables(true)
+    }
+
     setIsStateRestored(true)
   }, [currentUser?.id])
 
@@ -529,6 +536,14 @@ export function DatabaseExplorerPage() {
       String(hasAutoSelectedTables),
     )
   }, [hasAutoSelectedTables, currentUser?.id])
+
+  useEffect(() => {
+    if (!currentUser?.id) return
+    localStorage.setItem(
+      getStorageKey('db-explorer-expand-all-tables'),
+      String(expandAllTables),
+    )
+  }, [expandAllTables, currentUser?.id])
 
   useEffect(() => {
     mermaid.initialize({
