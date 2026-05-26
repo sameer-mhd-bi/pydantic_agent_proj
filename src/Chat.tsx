@@ -321,8 +321,8 @@ const Chat = () => {
 
   return (
     <ChatErrorBoundary>
-    <>
-      <Conversation className="h-full">
+    <div className={messages.length === 0 && conversationId === '/' ? "flex flex-col items-center justify-center h-full" : "flex flex-col h-full"}>
+      <Conversation className={messages.length === 0 && conversationId === '/' ? "hidden" : "flex-1 overflow-y-auto"}>
         <ConversationContent>
           {messages.map((message, messageIndex) => (
             <div key={message.id} className={message.role === 'user' ? 'group/user-message' : undefined}>
@@ -360,7 +360,7 @@ const Chat = () => {
               ))}
             </div>
           ))}
-          {status === 'submitted' && <Loader />}
+          {status === 'submitted' && <div className="flex justify-start"><Loader /></div>}
           {status === 'error' && error && (
             <div className="px-4 py-3 mx-4 my-2 bg-destructive/10 border border-destructive/20 rounded-md text-destructive text-sm">
               <strong>Error:</strong> {error.message}
@@ -370,7 +370,7 @@ const Chat = () => {
         <ConversationScrollButton />
       </Conversation>
 
-      <div className="sticky bottom-0 p-3">
+      <div className="p-3 w-full">
         {messages.length === 0 && conversationId === '/' && (
           <div className="px-3 pb-6">
             <h2 className="text-center text-3xl font-semibold tracking-tight text-foreground sm:text-3xl mb-2">
@@ -480,7 +480,7 @@ const Chat = () => {
         onModify={handleModify}
         onFork={handleFork}
       />
-    </>
+    </div>
     </ChatErrorBoundary>
   )
 }
