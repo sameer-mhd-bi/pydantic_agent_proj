@@ -822,17 +822,6 @@ DATABASE_SCHEMA:{agent_module.db_schema_memory_data}
 async def chat_endpoint(request: Request):
     """Handle chat requests using the current editable agent details as runtime memory."""
     try:
-        # Force fresh config load and reinitialize ALL connections before conversation
-        if HAS_MCP_SERVER:
-            try:
-                # Force invalidate cache and reload connections fresh
-                mcp_server.invalidate_config_cache()
-                mcp_server.initialize_postgresql_connection()
-                mcp_server.initialize_snowflake_connection()
-                logger.info("MCP connections refreshed with latest config for new conversation")
-            except Exception as e:
-                logger.warning("Failed to refresh MCP connections: %s", e)
-        
         adapter = await VercelAIAdapter.from_request(request, agent=agent)
         extra_data = ChatRequestExtra.model_validate(
             adapter.run_input.__pydantic_extra__ or {}

@@ -841,16 +841,16 @@ def _migrate_table_postgres_to_snowflake_sync(
         # STEP 7 — RECORD MIGRATION HISTORY
         # ============================================================
 
-        try:
-            record_mcp_migration(
-                source_table=source_table,
-                target_table=target_table,
-                rows_migrated=sf_count,
-                columns_count=len(columns)
-            )
-            logger.info("✓ Migration history recorded")
-        except Exception as e:
-            logger.warning("Failed to record migration history: %s", e)
+        # try:
+        #     record_mcp_migration(
+        #         source_table=source_table,
+        #         target_table=target_table,
+        #         rows_migrated=sf_count,
+        #         columns_count=len(columns)
+        #     )
+        #     logger.info("✓ Migration history recorded")
+        # except Exception as e:
+        #     logger.warning("Failed to record migration history: %s", e)
 
         # ============================================================
         # SUCCESS
@@ -1117,15 +1117,15 @@ def migrate_query_postgres_to_snowflake(
         logger.info("Row count validation - PostgreSQL: %d, Snowflake: %d", postgres_count, snowflake_count)
 
         # Record the migration history
-        try:
-            record_mcp_migration(
-                source_table=target_table,  # Use target_table as source name for queries
-                target_table=target_table,
-                rows_migrated=snowflake_count,
-                columns_count=len(columns)
-            )
-        except Exception as e:
-            logger.warning("Failed to record MCP migration: %s", e)
+        # try:
+        #     record_mcp_migration(
+        #         source_table=target_table,  # Use target_table as source name for queries
+        #         target_table=target_table,
+        #         rows_migrated=snowflake_count,
+        #         columns_count=len(columns)
+        #     )
+        # except Exception as e:
+        #     logger.warning("Failed to record MCP migration: %s", e)
 
         # ============================================================
         # STEP 8 — RETURN SUCCESS RESPONSE

@@ -109,6 +109,11 @@ const Chat = () => {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Edit state
+  // Flag set before programmatic navigation (handleSubmit/handleFork/handleNavigateToFork)
+  // so the conversationId effect can skip the message wipe/load for that cycle.
+  const navigatingRef = useRef(false)
+
+  // Edit state
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
   const editDraftsRef = useRef(new Map<string, string>())
   const [pendingEdit, setPendingEdit] = useState<{ messageId: string; text: string } | null>(null)
@@ -155,6 +160,7 @@ const Chat = () => {
     textareaRef.current?.focus()
   }, [conversationId])
 
+
   // Track and display streaming/tool errors
   useEffect(() => {
     if (error) {
@@ -174,6 +180,7 @@ const Chat = () => {
       if (stripBasePath(window.location.pathname) === '/') {
         const newConversationId = `/${nanoid()}`
         setConversationId(newConversationId)
+        navigatingRef.current = true
 
         saveConversationEntry(newConversationId, input, undefined, currentUser?.id)
 
@@ -308,9 +315,11 @@ const Chat = () => {
     setConversationId(newConversationId)
   }, [pendingEdit, messages, conversationId, model, enabledTools, setConversationId])
 
+
   const handleNavigateToFork = useCallback(
     (targetConversationId: string) => {
       setConversationId(targetConversationId)
+      navigatingRef.current = true
     },
     [setConversationId],
   )

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { stripBasePath, withBasePath } from '@/lib/base-path'
 
 export function useConversationIdFromUrl(): [string, (id: string) => void] {
@@ -6,11 +6,18 @@ export function useConversationIdFromUrl(): [string, (id: string) => void] {
     return stripBasePath(window.location.pathname)
   })
 
+  const conversationIdRef = useRef(conversationId)
+  useEffect(() => {
+    conversationIdRef.current = conversationId
+  }, [conversationId])
+
   useEffect(() => {
     const handlePopState = () => {
       const newId = stripBasePath(window.location.pathname)
       console.log('popstate event detected', window.location.pathname)
-      setConversationId(newId)
+      if (newId !== conversationIdRef.current) {
+        setConversationId(newId)
+      }
     }
 
     window.addEventListener('popstate', handlePopState)

@@ -234,15 +234,11 @@ export async function fetchMigrationHistory(): Promise<MigrationStats | null> {
 
     // Sync to local storage for overall consistency across views
     try {
-      const prevStored = localStorage.getItem(STATS_KEY)
       localStorage.setItem(STATS_KEY, JSON.stringify(stats))
       localStorage.setItem(TABLES_MIGRATION_KEY, JSON.stringify(tableMigrations))
       
       // If the data changed from what was in localStorage, dispatch an update event
       // so other components (like the dashboard) can react immediately
-      if (prevStored !== JSON.stringify(stats)) {
-        window.dispatchEvent(new CustomEvent('migration-stats-updated', { detail: stats }))
-      }
     } catch (e) {
       console.warn('Failed to sync server history to localStorage:', e)
     }
