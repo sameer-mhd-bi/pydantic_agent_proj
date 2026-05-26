@@ -1,0 +1,59 @@
+{
+  "version": "1.0",
+  "lastUpdated": "2026-05-26T05:09:41.722814Z",
+  "totalMigrations": 1,
+  "schemasAnalyzed": 1,
+  "tableMigrations": [
+    {
+      "tableName": "branch",
+      "sourceDatabase": "bank_db",
+      "targetDatabase": "DEV_DWH",
+      "rowsMigrated": 30,
+      "columnsCount": 4,
+      "timestamp": "2026-05-26T05:09:41.722814Z",
+      "status": "success"
+    }
+  ],
+  "records": [
+    {
+      "id": "migration-mcp-1779752381722",
+      "timestamp": "2026-05-26T05:09:41.722814Z",
+      "userId": "agent",
+      "userName": "AI Agent",
+      "schemasCount": 1,
+      "tablesCount": 1,
+      "tables": [
+        {
+          "tableName": "branch",
+          "sourceDatabase": "bank_db",
+          "targetDatabase": "DEV_DWH",
+          "rowsMigrated": 30,
+          "columnsCount": 4,
+          "timestamp": "2026-05-26T05:09:41.722814Z",
+          "status": "success"
+        }
+      ]
+    }
+  ],
+  "migrations": [
+    {
+      "id": "migration-mcp-1779752381722",
+      "timestamp": "2026-05-26T05:09:41.722814Z",
+      "userId": "agent",
+      "userName": "AI Agent",
+      "schemasCount": 1,
+      "tablesCount": 1,
+      "tables": [
+        {
+          "tableName": "branch",
+          "sourceDatabase": "bank_db",
+          "targetDatabase": "DEV_DWH",
+          "rowsMigrated": 30,
+          "columnsCount": 4,
+          "timestamp": "2026-05-26T05:09:41.722814Z",
+          "status": "success"
+        }
+      ]
+    }
+  ]
+}

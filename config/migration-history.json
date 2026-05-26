@@ -1,8 +1,8 @@
 {
   "version": "1.0",
-  "lastUpdated": "2026-05-26T05:04:21.552Z",
-  "totalMigrations": 8,
-  "schemasAnalyzed": 9,
+  "lastUpdated": "2026-05-26T05:09:41.720721Z",
+  "totalMigrations": 9,
+  "schemasAnalyzed": 10,
   "records": [
     {
       "id": "migration-1779710333804",
@@ -164,6 +164,25 @@
           "status": "success"
         }
       ]
+    },
+    {
+      "id": "migration-mcp-1779752381720",
+      "timestamp": "2026-05-26T05:09:41.720721Z",
+      "userId": "agent",
+      "userName": "AI Agent",
+      "schemasCount": 1,
+      "tablesCount": 1,
+      "tables": [
+        {
+          "tableName": "branch",
+          "sourceDatabase": "bank_db",
+          "targetDatabase": "DEV_DWH",
+          "rowsMigrated": 30,
+          "columnsCount": 4,
+          "timestamp": "2026-05-26T05:09:41.720721Z",
+          "status": "success"
+        }
+      ]
     }
   ],
   "tableMigrations": [
@@ -247,6 +266,197 @@
       "columnsCount": 16,
       "timestamp": "2026-05-26T05:04:21.551Z",
       "status": "success"
+    },
+    {
+      "tableName": "branch",
+      "sourceDatabase": "bank_db",
+      "targetDatabase": "DEV_DWH",
+      "rowsMigrated": 30,
+      "columnsCount": 4,
+      "timestamp": "2026-05-26T05:09:41.720721Z",
+      "status": "success"
+    }
+  ],
+  "migrations": [
+    {
+      "id": "migration-1779710333804",
+      "timestamp": "2026-05-25T11:58:53.804Z",
+      "userId": "admin-001",
+      "userName": "admin",
+      "schemasCount": 2,
+      "tablesCount": 2,
+      "tables": [
+        {
+          "tableName": "branch",
+          "sourceDatabase": "bank_db",
+          "targetDatabase": "bank_db",
+          "rowsMigrated": 0,
+          "columnsCount": 0,
+          "timestamp": "2026-05-25T11:58:53.804Z",
+          "status": "success"
+        },
+        {
+          "tableName": "accounts",
+          "sourceDatabase": "bank_db",
+          "targetDatabase": "bank_db",
+          "rowsMigrated": 0,
+          "columnsCount": 0,
+          "timestamp": "2026-05-25T11:58:53.804Z",
+          "status": "success"
+        }
+      ]
+    },
+    {
+      "id": "migration-1779723681764",
+      "timestamp": "2026-05-25T15:41:21.764Z",
+      "userId": "admin-001",
+      "userName": "admin",
+      "schemasCount": 1,
+      "tablesCount": 1,
+      "tables": [
+        {
+          "tableName": "customers",
+          "sourceDatabase": "migration_db",
+          "targetDatabase": "migration_db",
+          "rowsMigrated": 0,
+          "columnsCount": 0,
+          "timestamp": "2026-05-25T15:41:21.764Z",
+          "status": "success"
+        }
+      ]
+    },
+    {
+      "id": "migration-1779725648268",
+      "timestamp": "2026-05-25T16:14:08.268Z",
+      "userId": "admin-001",
+      "userName": "admin",
+      "schemasCount": 1,
+      "tablesCount": 1,
+      "tables": [
+        {
+          "tableName": "transactions",
+          "sourceDatabase": "migration_db",
+          "targetDatabase": "migration_db",
+          "rowsMigrated": 0,
+          "columnsCount": 0,
+          "timestamp": "2026-05-25T16:14:08.267Z",
+          "status": "success"
+        }
+      ]
+    },
+    {
+      "id": "migration-1779726105784",
+      "timestamp": "2026-05-25T16:21:45.784Z",
+      "userId": "admin-001",
+      "userName": "admin",
+      "schemasCount": 1,
+      "tablesCount": 1,
+      "tables": [
+        {
+          "tableName": "customers",
+          "sourceDatabase": "migration_db",
+          "targetDatabase": "migration_db",
+          "rowsMigrated": 0,
+          "columnsCount": 0,
+          "timestamp": "2026-05-25T16:21:45.784Z",
+          "status": "success"
+        }
+      ]
+    },
+    {
+      "id": "migration-1779726780303",
+      "timestamp": "2026-05-25T16:33:00.303Z",
+      "userId": "admin-001",
+      "userName": "admin",
+      "schemasCount": 1,
+      "tablesCount": 1,
+      "tables": [
+        {
+          "tableName": "customers",
+          "sourceDatabase": "migration_db",
+          "targetDatabase": "migration_db",
+          "rowsMigrated": 0,
+          "columnsCount": 0,
+          "timestamp": "2026-05-25T16:33:00.303Z",
+          "status": "success"
+        }
+      ]
+    },
+    {
+      "id": "migration-api-1779751429327",
+      "timestamp": "2026-05-26T04:53:49.327907Z",
+      "userId": "user",
+      "userName": "User",
+      "schemasCount": 1,
+      "tablesCount": 1,
+      "tables": [
+        {
+          "tableName": "electric_vehicle_data",
+          "sourceDatabase": "bank_db",
+          "targetDatabase": "Snowflake",
+          "rowsMigrated": 0,
+          "columnsCount": 16,
+          "timestamp": "2026-05-26T04:53:49.327907Z",
+          "status": "success"
+        }
+      ]
+    },
+    {
+      "id": "migration-1779771405192",
+      "timestamp": "2026-05-26T04:56:45.192Z",
+      "userId": "admin-001",
+      "userName": "admin",
+      "schemasCount": 1,
+      "tablesCount": 1,
+      "tables": [
+        {
+          "tableName": "electric_vehicle_data",
+          "sourceDatabase": "bank_db",
+          "targetDatabase": "bank_db",
+          "rowsMigrated": 0,
+          "columnsCount": 0,
+          "timestamp": "2026-05-26T04:56:45.192Z",
+          "status": "success"
+        }
+      ]
+    },
+    {
+      "id": "migration-1779771861552",
+      "timestamp": "2026-05-26T05:04:21.552Z",
+      "userId": "admin-001",
+      "userName": "admin",
+      "schemasCount": 1,
+      "tablesCount": 1,
+      "tables": [
+        {
+          "tableName": "electric_vehicle_data",
+          "sourceDatabase": "bank_db",
+          "targetDatabase": "bank_db",
+          "rowsMigrated": 0,
+          "columnsCount": 0,
+          "timestamp": "2026-05-26T05:04:21.551Z",
+          "status": "success"
+        }
+      ]
+    },
+    {
+      "id": "migration-mcp-1779752381720",
+      "timestamp": "2026-05-26T05:09:41.720721Z",
+      "userId": "agent",
+      "userName": "AI Agent",
+      "schemasCount": 1,
+      "tablesCount": 1,
+      "tables": [
+        {
+          "tableName": "branch",
+          "sourceDatabase": "bank_db",
+          "targetDatabase": "DEV_DWH",
+          "rowsMigrated": 30,
+          "columnsCount": 4,
+          "timestamp": "2026-05-26T05:09:41.720721Z",
+          "status": "success"
+        }
+      ]
     }
   ]
 }

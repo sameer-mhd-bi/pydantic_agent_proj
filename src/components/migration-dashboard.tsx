@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Activity, Database, TrendingUp, Calendar, UserIcon, Download } from 'lucide-react'
+import { Activity, Database, TrendingUp, Calendar, UserIcon, Download, ChevronDown } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { downloadMigrationHistory, fetchMigrationHistory, type MigrationStats } from '@/lib/migration-stats'
@@ -13,6 +13,19 @@ export function MigrationDashboard() {
   })
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
+
+  const toggleRowExpansion = (recordId: string) => {
+    setExpandedRows((prev) => {
+      const newSet = new Set(prev)
+      if (newSet.has(recordId)) {
+        newSet.delete(recordId)
+      } else {
+        newSet.add(recordId)
+      }
+      return newSet
+    })
+  }
 
   useEffect(() => {
     const handleStatsUpdate = async () => {
@@ -172,6 +185,7 @@ export function MigrationDashboard() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/50">
+                    <th className="px-4 py-3 text-left font-medium w-8"></th>
                     <th className="px-4 py-3 text-left font-medium">Timestamp</th>
                     <th className="px-4 py-3 text-left font-medium">User</th>
                     <th className="px-4 py-3 text-left font-medium">Schemas Analyzed</th>
@@ -179,31 +193,79 @@ export function MigrationDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {stats.records.map((record) => (
-                    <tr key={record.id} className="border-b hover:bg-muted/30 transition-colors">
-                      <td className="px-4 py-3 text-xs text-muted-foreground">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-3 w-3" />
-                          {new Date(record.timestamp).toLocaleString()}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <UserIcon className="h-3 w-3" />
-                          <span className="font-medium">{record.userName}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-purple-100 dark:bg-purple-900 text-purple-900 dark:text-purple-100 text-xs font-semibold">
-                          {record.schemasCount}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-900 dark:text-blue-100 text-xs font-semibold">
-                          {record.tablesCount}
-                        </span>
-                      </td>
-                    </tr>
+                  {stats.records.slice().reverse().map((record) => (
+                    <>
+                      <tr key={record.id} className="border-b hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => toggleRowExpansion(record.id)}>
+                        <td className="px-4 py-3 text-xs text-muted-foreground">
+                          <ChevronDown className={`h-4 w-4 transition-transform ${expandedRows.has(record.id) ? 'rotate-180' : ''}`} />
+                        </td>
+                        <td className="px-4 py-3 text-xs text-muted-foreground">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-3 w-3" />
+                            {new Date(record.timestamp).toLocaleString()}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <UserIcon className="h-3 w-3" />
+                            <span className="font-medium">{record.userName}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-purple-100 dark:bg-purple-900 text-purple-900 dark:text-purple-100 text-xs font-semibold">
+                            {record.schemasCount}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-900 dark:text-blue-100 text-xs font-semibold">
+                            {record.tablesCount}
+                          </span>
+                        </td>
+                      </tr>
+                      {expandedRows.has(record.id) && record.tables && record.tables.length > 0 && (
+                        <tr key={`${record.id}-details`} className="border-b bg-muted/10">
+                          <td colSpan={5} className="px-4 py-4">
+                            <div className="space-y-2">
+                              <h4 className="text-sm font-semibold">Tables Migrated:</h4>
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                {record.tables.map((table, idx) => (
+                                  <div key={idx} className="border rounded-lg p-3 bg-white dark:bg-slate-950 space-y-2">
+                                    <div className="flex items-start gap-2">
+                                      <Database className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                                      <div className="flex-1 min-w-0">
+                                        <p className="font-medium text-sm truncate">{table.tableName}</p>
+                                        <p className="text-xs text-muted-foreground">
+                                          {table.sourceDatabase} → {table.targetDatabase}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2 text-xs">
+                                      <div>
+                                        <span className="text-muted-foreground">Rows:</span>
+                                        <p className="font-semibold">{table.rowsMigrated}</p>
+                                      </div>
+                                      <div>
+                                        <span className="text-muted-foreground">Columns:</span>
+                                        <p className="font-semibold">{table.columnsCount}</p>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 pt-1">
+                                      <div className={`h-2 w-2 rounded-full ${table.status === 'success' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                                      <span className={`text-xs font-medium ${table.status === 'success' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                        {table.status === 'success' ? 'Success' : 'Failed'}
+                                      </span>
+                                    </div>
+                                    {table.error && (
+                                      <p className="text-xs text-red-600 dark:text-red-400 break-words">{table.error}</p>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </>
                   ))}
                 </tbody>
               </table>
